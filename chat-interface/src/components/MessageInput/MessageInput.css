@@ -1,0 +1,137 @@
+/* ─── Input area wrapper ──────────────────────────────────────── */
+.input-area {
+  flex-shrink: 0;
+  padding: 12px 24px 16px;
+  background: linear-gradient(to bottom, transparent, var(--bg-app) 40%);
+}
+
+/* ─── Input container ────────────────────────────────────────── */
+.input-container {
+  max-width: 768px;
+  margin: 0 auto;
+  position: relative;
+  display: flex;
+  align-items: center; 
+  gap: 8px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-hover);
+  border-radius: var(--radius-xl);
+  padding: 12px 14px 12px 18px;
+  transition: border-color var(--duration), box-shadow var(--duration);
+}
+
+.input-container:focus-within {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--accent-glow), 0 2px 16px rgba(0, 0, 0, 0.3);
+}
+
+/* ─── Textarea ───────────────────────────────────────────────── */
+.message-textarea {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: none;
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 24px;    
+  color: var(--text-primary);
+  min-height: 24px;      
+  max-height: calc(24px * 10 + 32px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  padding-top: 6px;       
+  padding-bottom: 6px;
+
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  border-radius: inherit;
+}
+
+/* Remove browser focus ring and any stray shadows on focus */
+.message-textarea:focus,
+.message-textarea:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+/* Ensure container doesn't show any default outline */
+.input-container:focus-within {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--accent-glow), 0 2px 16px rgba(0, 0, 0, 0.3);
+  outline: none;
+}
+
+/* ─── Input actions ──────────────────────────────────────────── */
+.input-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* ─── Send / stop button ──────────────────────────────────────── */
+.send-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--duration), transform var(--duration), box-shadow var(--duration);
+  flex-shrink: 0;
+
+  /* Default: disabled state */
+  background: var(--bg-surface2);
+  color: var(--text-dim);
+  cursor: not-allowed;
+}
+
+.send-btn.active {
+  background: var(--accent);
+  color: var(--text-inverted);
+  cursor: pointer;
+  box-shadow: 0 2px 8px var(--accent-glow);
+}
+
+.send-btn.active:hover {
+  background: var(--accent-hover);
+  transform: scale(1.05);
+}
+
+.send-btn.active:active {
+  transform: scale(0.95);
+}
+
+/* Stop button */
+.send-btn.stop {
+  background: var(--bg-surface2);
+  border: 1.5px solid var(--border-hover);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.send-btn.stop:hover {
+  background: rgba(248, 113, 113, 0.12);
+  border-color: rgba(248, 113, 113, 0.3);
+  color: var(--error);
+  transform: scale(1.05);
+}
+
+/* ─── Disclaimer ─────────────────────────────────────────────── */
+.input-disclaimer {
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  margin-top: 10px;
+  max-width: 768px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ─── Responsive ─────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .input-area {
+    padding: 10px 12px 14px;
+  }
+}
