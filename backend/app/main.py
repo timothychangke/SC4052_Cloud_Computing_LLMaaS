@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS ads (
     bid_cpm DECIMAL(10,2) NOT NULL,
     budget_remaining DECIMAL(10,2) NOT NULL,
     brand_safety_tags TEXT[],
-    embedding vector(1536),
+    embedding vector(768),
     active BOOLEAN DEFAULT true,
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
@@ -80,7 +80,7 @@ BEGIN
         SELECT 1 FROM pg_indexes WHERE indexname = 'ads_embedding_idx'
     ) THEN
         CREATE INDEX ads_embedding_idx ON ads
-            USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+            USING ivfflat (embedding vector_cosine_ops) WITH (lists = 10);
     END IF;
 
     IF NOT EXISTS (

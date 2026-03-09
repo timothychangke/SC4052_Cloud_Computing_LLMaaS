@@ -21,6 +21,9 @@ class Settings(BaseSettings):
 
     # -- AI module mode: "mock" while teammate is still building, "real" for prod --
     ai_module_mode: str = "mock"
+    
+    # -- Groq secret key --
+    groq_api_key: str = ""
 
     # -- CORS --
     cors_origins: str = "http://localhost:3000,http://localhost:5173"
