@@ -78,6 +78,18 @@ async def log_impression(session_id: str, ad_id: str, turn_number: int):
         ad_id,
     )
 
+    # ── campaign-level budget tracking ───────────────────────────────
+    campaign_row = await pool.fetchrow(
+        "SELECT campaign_id, bid_cpm FROM ads WHERE ad_id = $1::uuid",
+        ad_id,
+    )
+    if campaign_row and campaign_row["campaign_id"]:
+        from app.services.budget import record_spend
+        cost = float(campaign_row["bid_cpm"]) / 1000.0
+        await record_spend(str(campaign_row["campaign_id"]), cost)
+
+    log.info("event.impression", session_id=session_id, ad_id=ad_id)
+
     log.info("event.impression", session_id=session_id, ad_id=ad_id)
 
 
