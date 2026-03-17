@@ -96,13 +96,82 @@ BEGIN
     END IF;
 
     IF NOT EXISTS (
-        SELECT 1 FROM pg_indexes WHERE indexname = 'idx_events_created'
-    ) THEN
-        CREATE INDEX idx_events_created ON events(created_at);
-    END IF;
-END$$;
-"""
+            SELECT 1 FROM pg_indexes WHERE indexname = 'idx_events_created'
+        ) THEN
+            CREATE INDEX idx_events_created ON events(created_at);
+        END IF;
+    END$$;
 
+    -- ── Advertiser table expansions ─────────────────────────────────────────
+    ALTER TABLE advertisers ADD COLUMN IF NOT EXISTS company_name VARCHAR(500);
+    ALTER TABLE advertisers ADD COLUMN IF NOT EXISTS billing_email VARCHAR(255);
+    ALTER TABLE advertisers ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'active';
+
+    -- ── Campaigns table ─────────────────────────────────────────────────────
+    CREATE TABLE IF NOT EXISTS campaigns (
+        campaign_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        advertiser_id VARCHAR(255) NOT NULL REFERENCES advertisers(advertiser_id),
+        name VARCHAR(500) NOT NULL,
+        status VARCHAR(50) NOT NULL DEFAULT 'draft',
+        total_budget DECIMAL(12,2) NOT NULL,
+        daily_budget DECIMAL(12,2),
+        total_spent DECIMAL(12,2) NOT NULL DEFAULT 0,
+        today_spent DECIMAL(12,2) NOT NULL DEFAULT 0,
+        today_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        start_date DATE,
+        end_date DATE,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+    );
+
+    DO $$
+    BEGIN
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_indexes WHERE indexname = 'idx_campaigns_advertiser'
+        ) THEN
+            CREATE INDEX idx_campaigns_advertiser ON campaigns(advertiser_id);
+        END IF;
+
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_indexes WHERE indexname = 'idx_campaigns_status'
+        ) THEN
+            CREATE INDEX idx_campaigns_status ON campaigns(status);
+        END IF;
+    END$$;
+
+    -- ── Link ads to campaigns ───────────────────────────────────────────────
+    ALTER TABLE ads ADD COLUMN IF NOT EXISTS campaign_id UUID REFERENCES campaigns(campaign_id);
+
+    DO $$
+    BEGIN
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_indexes WHERE indexname = 'idx_ads_campaign'
+        ) THEN
+            CREATE INDEX idx_ads_campaign ON ads(campaign_id);
+        END IF;
+    END$$;
+
+    -- ── Daily spend log ─────────────────────────────────────────────────────
+    CREATE TABLE IF NOT EXISTS daily_spend_log (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        campaign_id UUID NOT NULL REFERENCES campaigns(campaign_id),
+        spend_date DATE NOT NULL,
+        impressions INT NOT NULL DEFAULT 0,
+        clicks INT NOT NULL DEFAULT 0,
+        engagements INT NOT NULL DEFAULT 0,
+        spend DECIMAL(12,2) NOT NULL DEFAULT 0,
+        UNIQUE(campaign_id, spend_date)
+    );
+
+    DO $$
+    BEGIN
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_indexes WHERE indexname = 'idx_daily_spend_campaign'
+        ) THEN
+            CREATE INDEX idx_daily_spend_campaign ON daily_spend_log(campaign_id, spend_date);
+        END IF;
+    END$$;
+    """
 
 async def _run_migrations():
     pool = get_pg()

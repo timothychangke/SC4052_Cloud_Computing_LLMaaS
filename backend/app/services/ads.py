@@ -56,8 +56,18 @@ async def get_candidate_ads(
         FROM ads
         WHERE active = true
           AND budget_remaining > 0
-        ORDER BY embedding <=> $1::vector
-        LIMIT 20
+          AND (
+              campaign_id IS NULL
+              OR campaign_id IN (
+                  SELECT c.campaign_id FROM campaigns c
+                  WHERE c.status = 'active'
+                    AND c.total_spent < c.total_budget
+                    AND (c.daily_budget IS NULL OR c.today_spent < c.daily_budget)
+                    AND (c.start_date IS NULL OR c.start_date <= CURRENT_DATE)
+                    AND (c.end_date IS NULL OR c.end_date >= CURRENT_DATE)
+              )
+          )
+        ORDER BY embedding <=> $1::vector0
         """,
         embedding_str,
     )
