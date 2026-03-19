@@ -8,6 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
+from datetime import date
 
 from pydantic import BaseModel, Field
 
@@ -30,6 +31,18 @@ class Intent(str, Enum):
     SUPPORT = "support"
     COMPLAINT = "complaint"
     SENSITIVE = "sensitive"
+
+
+class CampaignStatus(str, Enum):
+    DRAFT = "draft"
+    ACTIVE = "active"
+    PAUSED = "paused"
+    COMPLETED = "completed"
+
+
+class AdvertiserStatus(str, Enum):
+    ACTIVE = "active"
+    SUSPENDED = "suspended"
 
 
 # ── Core domain objects (dataclasses for internal use) ───────────────────
@@ -122,3 +135,109 @@ class AnalyticsSummary(BaseModel):
     ctr: float
     estimated_revenue: float
     top_ads: list[dict]
+
+
+# ── Advertiser Portal schemas ────────────────────────────────────────────
+
+# -- Advertiser --
+
+class AdvertiserCreatePayload(BaseModel):
+    advertiser_id: str = Field(..., min_length=1, max_length=255)
+    name: str = Field(..., min_length=1, max_length=500)
+    contact_email: Optional[str] = None
+    company_name: Optional[str] = None
+    billing_email: Optional[str] = None
+
+
+class AdvertiserUpdatePayload(BaseModel):
+    name: Optional[str] = None
+    contact_email: Optional[str] = None
+    company_name: Optional[str] = None
+    billing_email: Optional[str] = None
+    status: Optional[AdvertiserStatus] = None
+
+
+class AdvertiserResponse(BaseModel):
+    advertiser_id: str
+    name: str
+    contact_email: Optional[str] = None
+    company_name: Optional[str] = None
+    billing_email: Optional[str] = None
+    status: str
+    created_at: str
+
+
+# -- Campaign --
+
+class CampaignCreatePayload(BaseModel):
+    name: str = Field(..., min_length=1, max_length=500)
+    total_budget: float = Field(gt=0)
+    daily_budget: Optional[float] = Field(default=None, gt=0)
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+
+
+class CampaignUpdatePayload(BaseModel):
+    name: Optional[str] = None
+    total_budget: Optional[float] = Field(default=None, gt=0)
+    daily_budget: Optional[float] = Field(default=None, ge=0)  # 0 = remove cap
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+
+
+class CampaignResponse(BaseModel):
+    campaign_id: str
+    advertiser_id: str
+    name: str
+    status: str
+    total_budget: float
+    daily_budget: Optional[float]
+    total_spent: float
+    today_spent: float
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    created_at: str
+    updated_at: str
+
+
+# -- Campaign Ad (create ad within a campaign) --
+
+class CampaignAdCreatePayload(BaseModel):
+    product_name: str = Field(..., min_length=1)
+    product_description: str = ""
+    target_topics: list[str] = Field(default_factory=list)
+    target_intents: list[str] = Field(default_factory=list)
+    creative_text: str
+    cta_url: str
+    bid_cpm: float = Field(ge=0)
+    budget_remaining: float = Field(ge=0)
+    brand_safety_tags: list[str] = Field(default_factory=list)
+
+
+# -- Portal Analytics --
+
+class CampaignAnalyticsResponse(BaseModel):
+    campaign_id: str
+    campaign_name: str
+    status: str
+    total_budget: float
+    total_spent: float
+    impressions: int
+    clicks: int
+    engagements: int
+    ctr: float
+    daily_breakdown: list[dict]
+
+
+class AdvertiserAnalyticsResponse(BaseModel):
+    advertiser_id: str
+    name: str
+    total_campaigns: int
+    active_campaigns: int
+    total_spent: float
+    total_budget: float
+    impressions: int
+    clicks: int
+    engagements: int
+    ctr: float
+    campaigns: list[dict]
