@@ -22,7 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import get_settings
 from app.core.db import init_pools, close_pools, get_pg
 from app.core.logging import setup_logging
-from app.routers import chat, track, admin, analytics, health
+from app.routers import chat, track, admin, analytics, health, portal
 
 setup_logging(json_output=False)  # flip to True in prod
 log = structlog.get_logger()
@@ -221,6 +221,7 @@ def create_app() -> FastAPI:
     app.include_router(track.router)
     app.include_router(admin.router)
     app.include_router(analytics.router)
+    app.include_router(portal.router) 
 
     return app
 
