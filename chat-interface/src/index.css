@@ -12,8 +12,8 @@
 
   /* Borders */
   --border:        rgba(255, 255, 255, 0.07);
-  --border-focus:  rgba(255, 255, 255, 0.5);
-  --border-hover:  rgba(255, 255, 255, 0.12);
+  --border-focus:  rgba(245, 158, 11, 0.5);
+  --border-hover:  rgba(245, 158, 11, 0.15);
 
   /* Text */
   --text-primary:  #e6e6ef;
@@ -21,11 +21,11 @@
   --text-muted:    #55556a;
   --text-inverted: #0d0d10;
 
-  /* Accent — changed to white */
-  --accent:        #ffffff;
-  --accent-dim:    rgba(255, 255, 255, 0.08);
-  --accent-glow:   rgba(255, 255, 255, 0.12);
-  --accent-hover:  #ffffff;
+  /* Accent */ 
+  --accent:        #f59e0b;
+  --accent-dim:    rgba(245, 158, 11, 0.08);
+  --accent-glow:   rgba(245, 158, 11, 0.12);
+  --accent-hover:  #fbbf24;
 
   /* Status */
   --error:         #f87171;
