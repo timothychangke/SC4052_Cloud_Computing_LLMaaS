@@ -1,0 +1,693 @@
+\documentclass[12pt, a4paper]{article}
+
+% ============================================================
+% PACKAGES
+% ============================================================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{setspace}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{amsmath, amssymb}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{enumitem}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, fit, calc}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage[backend=biber, style=ieee, sorting=nyt]{biblatex}
+\usepackage{glossaries}
+\usepackage{appendix}
+\usepackage{tcolorbox}
+\usepackage{fancyhdr}
+
+% ============================================================
+% CONFIGURATION
+% ============================================================
+
+% Hyperlink styling
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!70!black,
+    citecolor=green!50!black,
+    urlcolor=blue!70!black,
+}
+
+% Code listing style
+\definecolor{codebg}{rgb}{0.96, 0.96, 0.96}
+\definecolor{codegreen}{rgb}{0, 0.5, 0}
+\definecolor{codegray}{rgb}{0.5, 0.5, 0.5}
+\definecolor{codepurple}{rgb}{0.58, 0, 0.82}
+
+\lstdefinestyle{pythonstyle}{
+    backgroundcolor=\color{codebg},
+    basicstyle=\ttfamily\footnotesize,
+    breaklines=true,
+    captionpos=b,
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{blue},
+    stringstyle=\color{codepurple},
+    numberstyle=\tiny\color{codegray},
+    numbers=left,
+    numbersep=5pt,
+    frame=single,
+    rulecolor=\color{black!30},
+    language=Python,
+    showstringspaces=false,
+    tabsize=4,
+}
+
+\lstdefinestyle{jsonstyle}{
+    backgroundcolor=\color{codebg},
+    basicstyle=\ttfamily\footnotesize,
+    breaklines=true,
+    frame=single,
+    rulecolor=\color{black!30},
+    showstringspaces=false,
+}
+
+\lstdefinestyle{sqlstyle}{
+    backgroundcolor=\color{codebg},
+    basicstyle=\ttfamily\footnotesize,
+    breaklines=true,
+    captionpos=b,
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{blue},
+    language=SQL,
+    frame=single,
+    rulecolor=\color{black!30},
+    showstringspaces=false,
+}
+
+% Header/footer
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\leftmark}
+\fancyhead[R]{Ad LLM as a Service}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% Line spacing
+\onehalfspacing
+
+% Bibliography file (create a corresponding .bib file)
+\addbibresource{references.bib}
+
+% Glossary entries
+\makeglossaries
+\newglossaryentry{llm}{name={LLM}, description={Large Language Model}}
+\newglossaryentry{cpm}{name={CPM}, description={Cost Per Mille (cost per thousand impressions)}}
+\newglossaryentry{ctr}{name={CTR}, description={Click-Through Rate}}
+\newglossaryentry{rag}{name={RAG}, description={Retrieval-Augmented Generation}}
+\newglossaryentry{ftc}{name={FTC}, description={Federal Trade Commission}}
+
+% ============================================================
+% TITLE PAGE
+% ============================================================
+\begin{document}
+
+\begin{titlepage}
+    \centering
+    \vspace*{2cm}
+
+    {\Huge\bfseries Ad LLM as a Service}\\[0.5cm]
+    {\LARGE An LLM-Powered Conversational Advertising Platform}\\[2cm]
+
+    {\Large\itshape A Project Report}\\[1cm]
+
+    {\large
+        \textbf{Author Name}\\
+        Student ID: XXXXXXXX\\[0.5cm]
+        \textbf{Teammate Name}\\
+        Student ID: YYYYYYYY\\[1.5cm]
+        School / Department Name\\
+        University Name\\[1cm]
+        Module Code --- Module Title\\[1.5cm]
+        \today
+    }
+
+    \vfill
+    \textit{Submitted in partial fulfilment of the requirements for [Degree/Module].}
+\end{titlepage}
+
+% ============================================================
+% FRONT MATTER
+% ============================================================
+\pagenumbering{roman}
+
+% Abstract
+\begin{abstract}
+\noindent
+% TODO: Write 150–250 word abstract covering:
+% - Problem: Traditional display ads are poorly suited to conversational AI interfaces.
+% - Approach: An LLM-powered ad platform that extracts user intent from conversations,
+%   semantically matches relevant ads, and instructs the LLM to naturally weave sponsored
+%   product recommendations into helpful responses.
+% - Key components: context extraction, vector-based ad matching, prompt-engineered
+%   response synthesis with mandatory disclosure, and engagement analytics.
+% - Results/contribution: A working prototype demonstrating higher engagement potential
+%   through conversational ad delivery versus traditional impressions.
+\end{abstract}
+
+\newpage
+\tableofcontents
+\newpage
+\listoffigures
+\listoftables
+\listofalgorithms
+\newpage
+
+% ============================================================
+% MAIN BODY
+% ============================================================
+\pagenumbering{arabic}
+
+% ============================================================
+\section{Introduction}
+\label{sec:introduction}
+% ============================================================
+
+\subsection{Background and Motivation}
+\label{subsec:background}
+% - The rise of conversational AI interfaces (ChatGPT, Claude, etc.)
+% - The shift in user behaviour from search-engine queries to conversational queries
+% - The advertising industry's challenge: traditional banner/display ads do not
+%   translate to chat-based interfaces
+% - Opportunity: monetise conversational AI through contextually relevant,
+%   naturally integrated product recommendations
+
+\subsection{Project Objectives}
+\label{subsec:objectives}
+% - Design and build an end-to-end LLM-powered conversational ad platform
+% - Deliver inline sponsored recommendations that feel like genuine suggestions
+% - Ensure FTC-compliant disclosure of sponsored content
+% - Implement semantic ad matching using vector embeddings and business-rule re-ranking
+% - Track user engagement beyond clicks --- measure conversational follow-ups
+% - Produce a functional MVP demonstrating the core value proposition
+
+\subsection{Scope and Constraints}
+\label{subsec:scope}
+% - MVP scope: single-service architecture, pre-loaded ad inventory, no advertiser portal
+% - Constraints: reliance on third-party LLM APIs, latency budgets (<3s total),
+%   cost considerations (embedding + two LLM calls per request)
+
+\subsection{Report Organisation}
+\label{subsec:report-org}
+% Briefly outline what each subsequent section covers.
+
+
+% ============================================================
+\section{Literature Review}
+\label{sec:literature-review}
+% ============================================================
+
+\subsection{Evolution of Digital Advertising}
+\label{subsec:evolution-ads}
+% - From banner ads to programmatic advertising
+% - Search advertising (Google Ads) and intent-based targeting
+% - Social media advertising and behavioural targeting
+% - The move towards native advertising and content-integrated formats
+
+\subsection{Large Language Models and Conversational AI}
+\label{subsec:llm-background}
+% - Transformer architecture and the emergence of LLMs (GPT, Claude, etc.)
+% - Capabilities relevant to this project: instruction following, structured output
+%   generation, contextual reasoning, tone adaptation
+% - Lightweight vs.\ capable models --- the spectrum from Haiku-tier to Sonnet-tier
+%   and when each is appropriate
+
+\subsection{Retrieval-Augmented Generation (RAG)}
+\label{subsec:rag}
+% - RAG paradigm: retrieve relevant context, augment the LLM prompt
+% - Vector embeddings and semantic similarity search
+% - Embedding models (OpenAI text-embedding-3-small, Cohere Embed, etc.)
+% - Vector databases and extensions (pgvector, Pinecone, Weaviate)
+% - Relevance to this project: ad matching as a specialised RAG pipeline
+
+\subsection{Advertising in Conversational Interfaces}
+\label{subsec:conversational-ads}
+% - Existing approaches: Bing Chat ads, Google SGE sponsored results
+% - Academic work on native advertising and user perception
+% - Ethical considerations: transparency, user trust, ad receptivity
+% - Regulatory frameworks: FTC disclosure requirements for sponsored content
+
+\subsection{Prompt Engineering for Controlled Generation}
+\label{subsec:prompt-engineering}
+% - Techniques for reliable structured output from LLMs
+% - Instruction-following and system prompts
+% - Balancing helpfulness with ad integration naturalness
+% - LLM-as-judge paradigm for automated quality evaluation
+
+\subsection{User Engagement Metrics in Conversational Systems}
+\label{subsec:engagement-metrics}
+% - Traditional ad metrics: impressions, CTR, conversion rate
+% - Novel conversational metrics: follow-up engagement, dwell time, attention verification
+% - Why conversational engagement is a stronger signal than click-through
+% - Related work on measuring user attention in dialogue systems
+
+\subsection{Summary and Research Gap}
+\label{subsec:lit-summary}
+% - Identify the gap: no open, well-documented architecture for LLM-native
+%   conversational advertising with semantic matching, natural integration,
+%   and engagement-based measurement
+% - Position your project as addressing this gap
+
+
+% ============================================================
+\section{Problem Statement}
+\label{sec:problem-statement}
+% ============================================================
+
+\subsection{Limitations of Traditional Ad Formats in Conversational AI}
+\label{subsec:traditional-ad-limitations}
+% - Banner and sidebar ads are absent in chat interfaces
+% - Pre-roll / interstitial formats break conversational flow
+% - Search-ad models rely on short keyword queries, not multi-turn dialogues
+
+\subsection{Technical Challenges}
+\label{subsec:technical-challenges}
+
+\subsubsection{Real-Time Intent Extraction from Multi-Turn Conversations}
+% - User intent is distributed across multiple turns, not a single query
+% - Need to classify purchase signals, ad receptivity, and sensitivity in real time
+
+\subsubsection{Semantic Ad Matching at Low Latency}
+% - Matching ads to conversational context is more nuanced than keyword matching
+% - Balancing relevance, bid price, and frequency caps in a scoring function
+% - Latency constraint: the full pipeline must complete in <3 seconds
+
+\subsubsection{Natural Ad Integration Without Degrading User Experience}
+% - The LLM must weave product mentions naturally, not as appended blocks
+% - Mandatory disclosure ([Sponsored]) must be consistent yet non-intrusive
+% - Irrelevant ads must be gracefully rejected by the LLM
+
+\subsubsection{Engagement Measurement Beyond Clicks}
+% - Clicks are sparse in conversational settings
+% - Need to detect whether a user's follow-up message engages with the shown ad
+% - This requires a classification capability (keyword matching → LLM classifier)
+
+\subsection{Ethical and Regulatory Considerations}
+\label{subsec:ethical-considerations}
+% - FTC compliance: clear and conspicuous disclosure of sponsored content
+% - User trust: ads in a conversational context carry higher trust expectations
+% - Sensitivity gating: suppressing ads during health crises, emotional distress,
+%   financial distress, or grief
+% - Data privacy: session data handling and retention policies
+
+\subsection{Formal Problem Definition}
+\label{subsec:formal-problem}
+% Optionally, a concise formal statement:
+% Given a user message m_t and conversation history H = {m_1, ..., m_{t-1}},
+% and an ad inventory A, produce a response r_t that:
+% (1) helpfully answers the user's query,
+% (2) naturally integrates a relevant sponsored product a* ∈ A if contextually
+%     appropriate, with mandatory disclosure, and
+% (3) logs engagement signals for performance measurement.
+
+
+% ============================================================
+\section{Solution Design}
+\label{sec:solution-design}
+% ============================================================
+
+\subsection{System Architecture Overview}
+\label{subsec:architecture-overview}
+% - High-level architecture diagram (TikZ or included figure)
+% - Data flow: User Message → Orchestrator → Context Extraction → Ad Matching
+%   → Response Synthesis → Frontend
+% - Tech stack summary table
+
+\begin{figure}[H]
+    \centering
+    % TODO: Replace with your architecture diagram (TikZ or \includegraphics)
+    % \includegraphics[width=\textwidth]{figures/architecture.png}
+    \fbox{\parbox{0.9\textwidth}{\centering\vspace{3cm}
+        \textit{[System Architecture Diagram --- see Section~\ref{subsec:architecture-overview}]}
+    \vspace{3cm}}}
+    \caption{High-level system architecture of the Ad LLM platform.}
+    \label{fig:architecture}
+\end{figure}
+
+\begin{table}[H]
+    \centering
+    \caption{Technology stack summary.}
+    \label{tab:tech-stack}
+    \begin{tabular}{@{}ll@{}}
+        \toprule
+        \textbf{Component}          & \textbf{Technology}                   \\ \midrule
+        Frontend                    & React                                 \\
+        Orchestrator API            & FastAPI (Python)                      \\
+        Session Store               & Redis                                 \\
+        Database                    & PostgreSQL + pgvector                 \\
+        Embedding Model             & text-embedding-3-small (OpenAI)       \\
+        Context Extraction LLM      & Claude Haiku (lightweight)            \\
+        Response Generation LLM     & Claude Sonnet (capable)               \\
+        Event Logging               & PostgreSQL (JSONB payload)            \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsection{Component Design}
+\label{subsec:component-design}
+
+\subsubsection{Orchestrator API (FastAPI)}
+\label{subsubsec:orchestrator}
+% - Central routing service: request validation, auth, rate limiting
+% - Orchestration flow for POST /chat (the seven-step pipeline)
+% - Graceful degradation: if any sub-component fails, return a normal response
+% - Latency optimisation: parallel pre-fetching, warm-start vector search
+% - Endpoint specifications: /chat, /track/click, /analytics/summary, /admin/ads
+
+\subsubsection{Context Extraction Module}
+\label{subsubsec:context-extraction}
+% - LLM-based (lightweight model) extraction of structured context from conversation
+% - Output schema: intent, topics, entities, sentiment, purchase_signal, ad_receptivity
+% - Prompt design rationale and iteration process
+% - Safety/sensitivity classifier: ad_receptivity = "none" for sensitive conversations
+% - Test set: 30+ conversation snippets with expected outputs
+
+\subsubsection{Session Management (Redis)}
+\label{subsubsec:session-management}
+% - Session schema: turns (rolling window of 10), accumulated topics,
+%   purchase signal history, ads shown (frequency cap), turn count
+% - TTL policy: 30-minute inactivity expiry
+% - Role in the pipeline: provides conversation history and frequency-cap data
+
+\subsubsection{Ad Inventory Store (PostgreSQL + pgvector)}
+\label{subsubsec:ad-inventory}
+% - Database schema: ads table (with vector(1536) column), events table, advertisers table
+% - pgvector justification over dedicated vector DB (scale, simplicity)
+% - IVFFlat index configuration
+% - Ad data model: product metadata, targeting fields, bid/budget, embedding
+
+\subsubsection{Embedding and Semantic Matching Pipeline}
+\label{subsubsec:embedding-matching}
+% - Ad embedding at ingestion time: embed_ad(text) → vector
+% - Query embedding at request time: embed_query(context) → vector
+% - What gets embedded on each side and why
+% - Vector similarity search: cosine distance, top-20 candidates
+
+\subsubsection{Re-Ranking and Business Logic}
+\label{subsubsec:reranking}
+% - Post-retrieval filtering: active ads, positive budget, frequency cap
+% - Composite scoring formula:
+%   score = similarity × 0.5 + bid_cpm_normalised × 0.3 + purchase_signal × 0.2
+% - Rationale for weight selection
+% - Return top 3 candidates to orchestrator
+
+\begin{algorithm}[H]
+    \caption{Ad Candidate Re-Ranking}
+    \label{alg:reranking}
+    \begin{algorithmic}[1]
+        \Require Query embedding $\mathbf{q}$, context $C$, session ID $s$
+        \Ensure Ranked list of top-$k$ ad candidates
+        \State $\mathit{raw} \gets \text{VectorSearch}(\mathbf{q}, \text{limit}=20)$
+            \Comment{pgvector cosine similarity}
+        \State $\mathit{shown} \gets \text{Redis.get}(s).\text{ads\_shown}$
+        \State $\mathit{candidates} \gets \{a \in \mathit{raw} \mid a.\text{active} \land a.\text{budget} > 0
+            \land a.\text{id} \notin \mathit{shown}\}$
+        \State $b_{\max} \gets \max_{a \in \mathit{candidates}} a.\text{bid\_cpm}$
+        \ForAll{$a \in \mathit{candidates}$}
+            \State $a.\text{score} \gets 0.5 \cdot a.\text{sim} + 0.3 \cdot \frac{a.\text{bid\_cpm}}{b_{\max}}
+                + 0.2 \cdot C.\text{purchase\_signal}$
+        \EndFor
+        \State \Return $\text{TopK}(\mathit{candidates}, k=3)$
+    \end{algorithmic}
+\end{algorithm}
+
+\subsubsection{Response Synthesis with Ad Injection}
+\label{subsubsec:response-synthesis}
+% - Main LLM call (Sonnet-tier) with carefully constructed prompt
+% - Prompt structure: system instruction, <sponsored_context> block, conversation history
+% - Design principles: naturalness, mandatory [Sponsored] disclosure, parseable
+%   markdown links, graceful rejection of irrelevant ads
+% - Output schema: response_text, ad_included, ad_id_used
+% - Prompt engineering challenges and iteration methodology
+
+\subsubsection{Click Tracking and Event Logging}
+\label{subsubsec:tracking}
+% - Tracking link generation: wrap CTA URLs through /track/click redirect
+% - Event model: impression, click, engagement, conversion
+% - Click redirect endpoint: log event → 302 redirect to advertiser URL
+% - Impression logging with CPM budget deduction
+% - Engagement detection: keyword/entity matching → LLM classifier
+
+\subsubsection{Analytics Dashboard}
+\label{subsubsec:analytics}
+% - /analytics/summary endpoint: impressions, CTR, engagements, revenue, top ads
+% - Internal React dashboard consuming the analytics API
+% - Key metrics and their computation
+
+\subsection{Interface Contracts and Workstream Division}
+\label{subsec:interface-contracts}
+% - Two-person team: Backend/Infrastructure vs.\ AI/LLM
+% - Agreed function signatures: extract_context, embed_query, embed_ad,
+%   get_candidate_ads, generate_response
+% - Communication pattern: backend calls AI modules; AI calls backend ad retrieval
+
+\begin{table}[H]
+    \centering
+    \caption{Interface contracts between Backend and AI workstreams.}
+    \label{tab:interface-contracts}
+    \begin{tabular}{@{}p{3.5cm}p{4cm}p{5cm}@{}}
+        \toprule
+        \textbf{Function}           & \textbf{Caller → Callee}  & \textbf{Description}              \\ \midrule
+        \texttt{extract\_context}   & Backend → AI              & Extract structured context from
+                                                                  user message and history           \\
+        \texttt{embed\_query}       & Backend → AI              & Generate query embedding from
+                                                                  extracted context                  \\
+        \texttt{embed\_ad}          & Backend → AI              & Generate ad embedding at
+                                                                  ingestion time                     \\
+        \texttt{get\_candidate\_ads}& AI → Backend              & Retrieve and rank ad candidates
+                                                                  via vector search                  \\
+        \texttt{generate\_response} & Backend → AI              & Synthesise response with optional
+                                                                  ad injection                       \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsection{Quality Assurance and Evaluation Framework}
+\label{subsec:quality-assurance}
+% - LLM-as-judge evaluator: helpfulness, naturalness, disclosure accuracy, ad relevance
+% - Evaluation sets for context extraction (30+ scenarios) and response synthesis (20–30 scenarios)
+% - Engagement detection accuracy testing
+% - End-to-end integration testing
+
+\subsection{Error Handling and Graceful Degradation}
+\label{subsec:error-handling}
+% - Failure modes and fallback strategies for each component
+% - Timeout configuration: 10s for context extraction, 30s for response generation
+% - Monitoring and alerting: error rate, latency, ad fill rate
+
+
+% ============================================================
+\section{Illustrative Examples}
+\label{sec:illustrative-examples}
+% ============================================================
+
+\subsection{Example 1: Product Research Conversation}
+\label{subsec:example-product-research}
+% - Scenario: User asks "What are the best running shoes for marathon training?"
+% - Walk through the full pipeline:
+%   1. Context extraction output (intent: product_research, purchase_signal: 0.85,
+%      ad_receptivity: high)
+%   2. Query embedding and vector search results
+%   3. Re-ranking with business rules → selected ad (e.g., Nike Pegasus 41)
+%   4. Prompt assembled with <sponsored_context>
+%   5. Generated response with natural [Sponsored] mention and tracking link
+%   6. Impression logged, budget deducted
+% - Show the actual JSON payloads at each step
+
+\subsection{Example 2: Sensitive Conversation (Ad Suppression)}
+\label{subsec:example-sensitive}
+% - Scenario: User is discussing financial distress or emotional difficulty
+% - Context extraction returns ad_receptivity: "none"
+% - Pipeline skips ad matching entirely
+% - Response generated without any <sponsored_context> block
+% - Demonstrates the ethical safeguard
+
+\subsection{Example 3: Irrelevant Ad Rejection}
+\label{subsec:example-irrelevant}
+% - Scenario: User asks about cooking; the only available ads are for running shoes
+% - Context extraction returns relevant topics (cooking, recipes)
+% - Vector search returns low-similarity running shoe ads
+% - Even if passed to the LLM, the prompt instructs it to ignore irrelevant ads
+% - Generated response is purely helpful with no product mention
+
+\subsection{Example 4: Engagement Follow-Up}
+\label{subsec:example-engagement}
+% - Scenario: After seeing an ad for Nike Pegasus 41, user asks
+%   "Tell me more about the Pegasus 41"
+% - Engagement classifier detects follow-up about the advertised product
+% - Engagement event logged (stronger signal than a click)
+% - Subsequent response provides more detail, potentially with a second ad mention
+
+\subsection{Example 5: Multi-Turn Context Accumulation}
+\label{subsec:example-multi-turn}
+% - Scenario: Conversation starts casual, then shifts towards product research
+%   over several turns
+% - Show how accumulated_topics and purchase_signal_history evolve in Redis
+% - Show how ad_receptivity transitions from "low" → "medium" → "high"
+% - Demonstrate the session state driving dynamic ad targeting
+
+
+% ============================================================
+\section{Conclusions}
+\label{sec:conclusions}
+% ============================================================
+
+\subsection{Summary of Contributions}
+\label{subsec:summary-contributions}
+% - End-to-end architecture for LLM-native conversational advertising
+% - Semantic ad matching via RAG-style vector retrieval + business-rule re-ranking
+% - Prompt-engineered natural ad integration with mandatory FTC-compliant disclosure
+% - Novel engagement metric: conversational follow-up as a stronger signal than CTR
+% - Ethical safeguards: sensitivity-aware ad gating
+
+\subsection{Workstream Contributions}
+\label{subsec:workstream-contributions}
+% - Backend/Infrastructure: orchestrator, session management, database schema,
+%   ad matching pipeline, click tracking, analytics API, frontend integration
+% - AI/LLM: context extraction, embedding pipeline, response synthesis,
+%   engagement classifier, LLM-as-judge evaluator
+
+\subsection{Limitations}
+\label{subsec:limitations}
+% - Dependence on third-party LLM APIs (latency, cost, availability)
+% - Heuristic re-ranking weights (not learned from data)
+% - Small ad inventory for testing; scalability not yet validated at 100k+ ads
+% - No real advertiser feedback or A/B testing results
+% - Engagement classifier starts with keyword matching (limited accuracy)
+
+\subsection{Future Work}
+\label{subsec:future-work}
+% - Attention verification model (dwell time, read-through estimation)
+% - Predicted CTR model trained on click/engagement data
+% - Advertiser self-serve portal with campaign management
+% - A/B testing infrastructure for ad insertion strategies
+% - Tone adaptation: match ad copy to conversational register
+% - Brand safety and content filtering (topic classifier + blocklist)
+% - Fine-tuning context extraction on domain-specific data
+
+\subsection{Reflections}
+\label{subsec:reflections}
+% - Lessons learned from the two-workstream collaboration
+% - Prompt engineering iteration process and key insights
+% - Balancing user experience with monetisation goals
+% - Ethical considerations encountered during development
+
+
+% ============================================================
+% REFERENCES
+% ============================================================
+\newpage
+\printbibliography[heading=bibintoc, title={References}]
+
+% Placeholder: create a references.bib file with entries such as:
+% @article{vaswani2017attention,
+%   title={Attention is all you need},
+%   author={Vaswani, Ashish and others},
+%   journal={Advances in Neural Information Processing Systems},
+%   year={2017}
+% }
+% @misc{openai2023gpt4,
+%   title={GPT-4 Technical Report},
+%   author={{OpenAI}},
+%   year={2023}
+% }
+% @article{lewis2020rag,
+%   title={Retrieval-augmented generation for knowledge-intensive NLP tasks},
+%   author={Lewis, Patrick and others},
+%   journal={Advances in Neural Information Processing Systems},
+%   year={2020}
+% }
+% @misc{ftc2023endorsements,
+%   title={FTC Endorsement Guides},
+%   author={{Federal Trade Commission}},
+%   year={2023},
+%   url={https://www.ftc.gov/legal-library/browse/federal-register-notices/16-cfr-part-255-guides-concerning-use-endorsements-testimonials-advertising}
+% }
+
+
+% ============================================================
+% APPENDICES
+% ============================================================
+\newpage
+\begin{appendices}
+
+\section{Database Schema}
+\label{app:schema}
+% - Full CREATE TABLE statements for ads, events, advertisers
+% - Index definitions
+% - Include the SQL from the backend workstream document
+
+\section{API Endpoint Specifications}
+\label{app:api-endpoints}
+% - Full request/response schemas for all endpoints
+% - POST /chat, GET /track/click, GET /analytics/summary, POST /admin/ads
+
+\section{Prompt Templates}
+\label{app:prompts}
+% - Context extraction prompt (full text)
+% - Response synthesis system prompt (full text)
+% - LLM-as-judge evaluation prompt (full text)
+
+\section{Context Extraction Test Cases}
+\label{app:test-cases-extraction}
+% - Table of 30+ test conversation snippets with expected extraction outputs
+
+\section{Response Synthesis Evaluation Set}
+\label{app:test-cases-synthesis}
+% - Table of 20–30 scenarios with expected quality scores
+
+\section{Session State Schema}
+\label{app:session-schema}
+% - Full Redis session object schema with field descriptions
+
+\section{Project Timeline}
+\label{app:timeline}
+% - Gantt chart or week-by-week table for both workstreams
+
+\begin{table}[H]
+    \centering
+    \caption{Project timeline by workstream.}
+    \label{tab:timeline}
+    \begin{tabular}{@{}clll@{}}
+        \toprule
+        \textbf{Week} & \textbf{Backend Workstream}    & \textbf{AI/LLM Workstream}    & \textbf{Milestone}    \\ \midrule
+        1   & Orchestrator skeleton, Redis,      & Context extraction prompt      & Infrastructure        \\
+            & Postgres + pgvector schema         & design + module                & foundation            \\[4pt]
+        2   & Ad CRUD API, bulk ingestion,       & Embedding functions,           & Ad matching           \\
+            & re-ranking logic                   & retrieval quality testing       & pipeline ready        \\[4pt]
+        3   & Click tracking, event logging,     & Response synthesis prompt       & Core pipeline         \\
+            & tracking link generator            & engineering + module           & complete              \\[4pt]
+        4   & Analytics API, frontend            & Eval set, quality tuning,      & End-to-end            \\
+            & integration, end-to-end wiring     & engagement classifier          & integration           \\[4pt]
+        5   & Error handling, monitoring,        & LLM-as-judge evaluator,        & Demo-ready            \\
+            & hardening                          & attention model start          & MVP                   \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\end{appendices}
+
+% ============================================================
+% GLOSSARY
+% ============================================================
+\newpage
+\printglossaries
+
+\end{document}
