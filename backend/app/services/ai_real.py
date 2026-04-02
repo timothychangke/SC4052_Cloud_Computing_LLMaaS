@@ -44,6 +44,14 @@ def _get_embed_model() -> SentenceTransformer:
     return _embed_model
 
 
+async def warmup_embed_model() -> None:
+    """Load and warm up the embedding model at startup to avoid first-request latency."""
+    model = await asyncio.to_thread(SentenceTransformer, _EMBED_MODEL)
+    await asyncio.to_thread(model.encode, "warmup")
+    global _embed_model
+    _embed_model = model
+
+
 # Embedding helper
 
 async def _embed(text: str) -> list[float]:
@@ -120,9 +128,54 @@ async def real_embed_query(context: ContextObject) -> list[float]:
 
 # ── Contract 3: Ad Embedding (ingestion time) ───────────────────────────
 
-async def real_embed_ad(text: str) -> list[float]:
-    """Embed ad creative text as a 768-dim vector for pgvector indexing."""
-    return await _embed(text)
+async def real_embed_ad(
+    product_name: str,
+    product_description: str,
+    target_topics: list[str],
+    target_intents: list[str],
+) -> list[float]:
+    """
+    Extracts structured keywords from the ad via Groq (mirroring the schema
+    that real_embed_query produces on the query side), then embeds those
+    keywords.  Both sides of the cosine search now live in the same
+    vocabulary space: intent + topics + entities + sentiment.
+    """
+    prompt = f"""Extract keywords from this advertisement for semantic ad-matching.
+Return a JSON object with EXACTLY these fields — no extra text:
+
+{{
+  "intent": "<one of: product_research, comparison, purchase, general_question>",
+  "topics": ["<topic1>", ...],
+  "entities": ["<brand or product name>", ...],
+  "sentiment": "<one of: positive, neutral>"
+}}
+
+Product name: {product_name}
+Description: {product_description}
+Target topics: {', '.join(target_topics)}
+Target intents: {', '.join(target_intents)}"""
+
+    resp = await _get_groq().chat.completions.create(
+        model=_CHAT_MODEL,
+        max_tokens=256,
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    raw = resp.choices[0].message.content.strip()
+    if raw.startswith("```"):
+        parts = raw.split("```")
+        raw = parts[1].lstrip("json").strip() if len(parts) > 1 else raw
+
+    data = json.loads(raw)
+
+    # Mirror real_embed_query exactly so both sides share the same vocabulary
+    keyword_text = " ".join([
+        data.get("intent", "product_research"),
+        *data.get("topics", target_topics),
+        *data.get("entities", [product_name]),
+        data.get("sentiment", "positive"),
+    ])
+    return await _embed(keyword_text)
 
 
 # ── Contract 5: Response Synthesis ──────────────────────────────────────
@@ -187,6 +240,42 @@ async def real_generate_response(
         ad_included=False,
         ad_id_used=None,
     )
+
+
+# ── Contract 7: Product Extraction from URL ─────────────────────────────
+
+async def real_extract_product_from_url(page_text: str) -> dict:
+    """
+    Uses Groq LLM to extract ad-ready product info from scraped webpage text.
+    Returns a dict matching CampaignAdCreatePayload fields (minus cta_url/bid/budget).
+    """
+    prompt = f"""You are an ad creation assistant. Extract product information from the following webpage content.
+Return a JSON object with EXACTLY these fields — no extra text:
+
+{{
+  "product_name": "<product name>",
+  "product_description": "<1-2 sentence product description>",
+  "creative_text": "<compelling ad copy, 1-2 sentences>",
+  "target_topics": ["<topic1>", "<topic2>"],
+  "target_intents": ["<one of: product_research, comparison, purchase, general_question>"],
+  "brand_safety_tags": ["<tag1>", "<tag2>"]
+}}
+
+Webpage content:
+{page_text[:8000]}"""
+
+    resp = await _get_groq().chat.completions.create(
+        model=_CHAT_MODEL,
+        max_tokens=512,
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    raw = resp.choices[0].message.content.strip()
+    if raw.startswith("```"):
+        parts = raw.split("```")
+        raw = parts[1].lstrip("json").strip() if len(parts) > 1 else raw
+
+    return json.loads(raw)
 
 
 # ── Contract 6: Engagement Detection ────────────────────────────────────

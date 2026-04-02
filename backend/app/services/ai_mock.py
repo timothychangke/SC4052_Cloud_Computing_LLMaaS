@@ -42,7 +42,12 @@ async def mock_embed_query(context: ContextObject) -> list[float]:
 
 # ── Contract 3: Ad Embedding (ingestion time) ───────────────────────────
 
-async def mock_embed_ad(text: str) -> list[float]:
+async def mock_embed_ad(
+    product_name: str,
+    product_description: str,
+    target_topics: list[str],
+    target_intents: list[str],
+) -> list[float]:
     """Same idea — random vector so we can test the ingestion pipeline."""
     return [random.uniform(-1, 1) for _ in range(1536)]
 
@@ -81,6 +86,20 @@ async def mock_generate_response(
         ad_included=False,
         ad_id_used=None,
     )
+
+
+# ── Contract 7: Product Extraction from URL ─────────────────────────────
+
+async def mock_extract_product_from_url(page_text: str) -> dict:
+    """Returns canned product data for testing the extraction pipeline."""
+    return {
+        "product_name": "Sample Product",
+        "product_description": "A high-quality product designed to meet your everyday needs.",
+        "creative_text": "Discover the difference quality makes. Shop now and save!",
+        "target_topics": ["shopping", "product"],
+        "target_intents": ["product_research", "purchase"],
+        "brand_safety_tags": ["general", "shopping"],
+    }
 
 
 # ── Contract 6: Engagement Detection ────────────────────────────────────

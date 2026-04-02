@@ -187,6 +187,10 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     await init_pools(settings.database_dsn, settings.redis_url)
     await _run_migrations()
+    if settings.ai_module_mode == "real":
+        from app.services.ai_real import warmup_embed_model
+        await warmup_embed_model()
+        log.info("embed_model.ready")
     log.info("app.started", mode=settings.ai_module_mode)
     yield
     await close_pools()

@@ -99,8 +99,12 @@ async def main():
     print(f"Seeding {len(SAMPLE_ADS)} ads...")
 
     for ad in SAMPLE_ADS:
-        text_to_embed = f"{ad['product_name']} {ad['product_description']} {' '.join(ad['target_topics'])}"
-        embedding = await embed_ad(text_to_embed)
+        embedding = await embed_ad(
+            ad["product_name"],
+            ad["product_description"],
+            ad["target_topics"],
+            ad["target_intents"],
+        )
         embedding_str = "[" + ",".join(str(v) for v in embedding) + "]"
 
         await pool.execute(
