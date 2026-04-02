@@ -33,14 +33,19 @@ async def embed_query(context: ContextObject) -> list[float]:
         return await mock_embed_query(context)
 
 
-async def embed_ad(text: str) -> list[float]:
+async def embed_ad(
+    product_name: str,
+    product_description: str,
+    target_topics: list[str],
+    target_intents: list[str],
+) -> list[float]:
     settings = get_settings()
     if settings.ai_module_mode == "real":
         from app.services.ai_real import real_embed_ad
-        return await real_embed_ad(text)
+        return await real_embed_ad(product_name, product_description, target_topics, target_intents)
     else:
         from app.services.ai_mock import mock_embed_ad
-        return await mock_embed_ad(text)
+        return await mock_embed_ad(product_name, product_description, target_topics, target_intents)
 
 
 async def generate_response(

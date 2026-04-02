@@ -67,7 +67,7 @@ async def get_candidate_ads(
                     AND (c.end_date IS NULL OR c.end_date >= CURRENT_DATE)
               )
           )
-        ORDER BY embedding <=> $1::vector0
+        ORDER BY embedding <=> $1::vector
         """,
         embedding_str,
     )

@@ -22,7 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import get_settings
 from app.core.db import init_pools, close_pools, get_pg
 from app.core.logging import setup_logging
-from app.routers import chat, track, admin, analytics, health, portal
+from app.routers import chat, track, admin, analytics, health#, portal
 
 setup_logging(json_output=False)  # flip to True in prod
 log = structlog.get_logger()
@@ -187,6 +187,10 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     await init_pools(settings.database_dsn, settings.redis_url)
     await _run_migrations()
+    if settings.ai_module_mode == "real":
+        from app.services.ai_real import warmup_embed_model
+        await warmup_embed_model()
+        log.info("embed_model.ready")
     log.info("app.started", mode=settings.ai_module_mode)
     yield
     await close_pools()
@@ -221,7 +225,7 @@ def create_app() -> FastAPI:
     app.include_router(track.router)
     app.include_router(admin.router)
     app.include_router(analytics.router)
-    app.include_router(portal.router) 
+    # app.include_router(portal.router) 
 
     return app
 

@@ -35,8 +35,9 @@ async def bulk_create_ads(ads: list[AdCreatePayload]):
 
     for ad in ads:
         # build the text blob we embed (same concat the teammate expects)
-        text_to_embed = f"{ad.product_name} {ad.product_description} {' '.join(ad.target_topics)}"
-        embedding = await embed_ad(text_to_embed)
+        embedding = await embed_ad(
+            ad.product_name, ad.product_description, ad.target_topics, ad.target_intents
+        )
         embedding_str = "[" + ",".join(str(v) for v in embedding) + "]"
 
         row = await pool.fetchrow(

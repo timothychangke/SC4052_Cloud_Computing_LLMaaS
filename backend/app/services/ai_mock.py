@@ -42,7 +42,12 @@ async def mock_embed_query(context: ContextObject) -> list[float]:
 
 # ── Contract 3: Ad Embedding (ingestion time) ───────────────────────────
 
-async def mock_embed_ad(text: str) -> list[float]:
+async def mock_embed_ad(
+    product_name: str,
+    product_description: str,
+    target_topics: list[str],
+    target_intents: list[str],
+) -> list[float]:
     """Same idea — random vector so we can test the ingestion pipeline."""
     return [random.uniform(-1, 1) for _ in range(1536)]
 
