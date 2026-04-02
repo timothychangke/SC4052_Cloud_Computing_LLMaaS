@@ -64,6 +64,16 @@ async def generate_response(
         return await mock_generate_response(message, history, context, ads, tracking_urls)
 
 
+async def extract_product_from_url(page_text: str) -> dict:
+    settings = get_settings()
+    if settings.ai_module_mode == "real":
+        from app.services.ai_real import real_extract_product_from_url
+        return await real_extract_product_from_url(page_text)
+    else:
+        from app.services.ai_mock import mock_extract_product_from_url
+        return await mock_extract_product_from_url(page_text)
+
+
 async def detect_engagement(follow_up_message: str, shown_ad: Ad) -> bool:
     settings = get_settings()
     if settings.ai_module_mode == "real":

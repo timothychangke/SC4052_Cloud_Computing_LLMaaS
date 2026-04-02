@@ -242,6 +242,42 @@ async def real_generate_response(
     )
 
 
+# ── Contract 7: Product Extraction from URL ─────────────────────────────
+
+async def real_extract_product_from_url(page_text: str) -> dict:
+    """
+    Uses Groq LLM to extract ad-ready product info from scraped webpage text.
+    Returns a dict matching CampaignAdCreatePayload fields (minus cta_url/bid/budget).
+    """
+    prompt = f"""You are an ad creation assistant. Extract product information from the following webpage content.
+Return a JSON object with EXACTLY these fields — no extra text:
+
+{{
+  "product_name": "<product name>",
+  "product_description": "<1-2 sentence product description>",
+  "creative_text": "<compelling ad copy, 1-2 sentences>",
+  "target_topics": ["<topic1>", "<topic2>"],
+  "target_intents": ["<one of: product_research, comparison, purchase, general_question>"],
+  "brand_safety_tags": ["<tag1>", "<tag2>"]
+}}
+
+Webpage content:
+{page_text[:8000]}"""
+
+    resp = await _get_groq().chat.completions.create(
+        model=_CHAT_MODEL,
+        max_tokens=512,
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    raw = resp.choices[0].message.content.strip()
+    if raw.startswith("```"):
+        parts = raw.split("```")
+        raw = parts[1].lstrip("json").strip() if len(parts) > 1 else raw
+
+    return json.loads(raw)
+
+
 # ── Contract 6: Engagement Detection ────────────────────────────────────
 
 async def real_detect_engagement(follow_up_message: str, shown_ad: Ad) -> bool:

@@ -88,6 +88,20 @@ async def mock_generate_response(
     )
 
 
+# ── Contract 7: Product Extraction from URL ─────────────────────────────
+
+async def mock_extract_product_from_url(page_text: str) -> dict:
+    """Returns canned product data for testing the extraction pipeline."""
+    return {
+        "product_name": "Sample Product",
+        "product_description": "A high-quality product designed to meet your everyday needs.",
+        "creative_text": "Discover the difference quality makes. Shop now and save!",
+        "target_topics": ["shopping", "product"],
+        "target_intents": ["product_research", "purchase"],
+        "brand_safety_tags": ["general", "shopping"],
+    }
+
+
 # ── Contract 6: Engagement Detection ────────────────────────────────────
 
 async def mock_detect_engagement(follow_up_message: str, shown_ad: Ad) -> bool:

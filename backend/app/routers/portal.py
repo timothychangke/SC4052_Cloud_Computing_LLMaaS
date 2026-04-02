@@ -23,6 +23,7 @@ Endpoints:
     POST   /portal/campaigns/{campaign_id}/resume           → resume
 
   Ads (within campaigns):
+    POST   /portal/ads/extract-from-url                     → extract ad fields from product URL
     POST   /portal/campaigns/{campaign_id}/ads              → create ad(s)
     GET    /portal/campaigns/{campaign_id}/ads              → list ads
     PATCH  /portal/ads/{ad_id}                              → update ad
@@ -39,7 +40,13 @@ import structlog
 from fastapi import APIRouter, HTTPException, Query
 
 from app.core.db import get_pg
-from app.services.ai import embed_ad
+import html as _html
+import re as _re
+
+import httpx
+from pydantic import BaseModel
+
+from app.services.ai import embed_ad, extract_product_from_url
 from app.models.schemas import (
     AdvertiserCreatePayload,
     AdvertiserUpdatePayload,
@@ -407,6 +414,41 @@ def _campaign_row_to_response(row) -> CampaignResponse:
 #  ADS (within campaigns)
 # ═══════════════════════════════════════════════════════════════════════════
 
+class _UrlExtractRequest(BaseModel):
+    url: str
+
+
+@router.post("/ads/extract-from-url")
+async def extract_ad_from_url(body: _UrlExtractRequest):
+    """Fetch a product URL and use the LLM to extract ad-ready fields."""
+    url = body.url.strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="url is required")
+
+    try:
+        async with httpx.AsyncClient(follow_redirects=True, timeout=15.0) as client:
+            response = await client.get(
+                url, headers={"User-Agent": "Mozilla/5.0 (compatible; AdBot/1.0)"}
+            )
+            response.raise_for_status()
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=400, detail=f"Failed to fetch URL: {exc}")
+
+    # Strip HTML tags and collapse whitespace before sending to LLM
+    page_text = _re.sub(r"<[^>]+>", " ", response.text)
+    page_text = _html.unescape(page_text)
+    page_text = _re.sub(r"\s+", " ", page_text).strip()
+
+    try:
+        extracted = await extract_product_from_url(page_text)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"AI extraction failed: {exc}")
+
+    extracted["cta_url"] = url
+    log.info("portal.ad_extracted_from_url", url=url, product=extracted.get("product_name"))
+    return extracted
+
+
 @router.post("/campaigns/{campaign_id}/ads", status_code=201)
 async def create_campaign_ads(campaign_id: str, ads: list[CampaignAdCreatePayload]):
     """Create one or more ads linked to a campaign."""
@@ -426,11 +468,12 @@ async def create_campaign_ads(campaign_id: str, ads: list[CampaignAdCreatePayloa
     created_ids = []
 
     for ad in ads:
-        text_to_embed = (
-            f"{ad.product_name} {ad.product_description} "
-            f"{' '.join(ad.target_topics)}"
+        embedding = await embed_ad(
+            ad.product_name,
+            ad.product_description,
+            ad.target_topics,
+            ad.target_intents,
         )
-        embedding = await embed_ad(text_to_embed)
         embedding_str = "[" + ",".join(str(v) for v in embedding) + "]"
 
         row = await pool.fetchrow(

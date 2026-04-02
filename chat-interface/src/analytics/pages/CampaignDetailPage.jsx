@@ -5,7 +5,7 @@ import {
 } from "recharts";
 import {
   ChevronRight, Plus, Pencil, Pause, Play, Trash2, Tag,
-  Eye, MousePointerClick, MessageSquare, TrendingUp, DollarSign
+  Eye, MousePointerClick, MessageSquare, TrendingUp, DollarSign, Link
 } from "lucide-react";
 import { api } from "../api/client";
 import { MOCK } from "../mocks/data";
@@ -61,7 +61,30 @@ function CreateAdModal({ campaignId, onClose, onSuccess, onError }) {
     bid_cpm: "", budget_remaining: "",
     target_topics: [], target_intents: [], brand_safety_tags: [],
   });
+  const [urlInput, setUrlInput] = useState("");
+  const [extracting, setExtracting] = useState(false);
+
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const extractFromUrl = async () => {
+    if (!urlInput.trim()) return;
+    setExtracting(true);
+    try {
+      const data = await api.post("/portal/ads/extract-from-url", { url: urlInput.trim() });
+      setForm(f => ({
+        ...f,
+        product_name: data.product_name || f.product_name,
+        product_description: data.product_description || f.product_description,
+        creative_text: data.creative_text || f.creative_text,
+        cta_url: data.cta_url || f.cta_url,
+        target_topics: data.target_topics?.length ? data.target_topics : f.target_topics,
+        target_intents: data.target_intents?.length ? data.target_intents : f.target_intents,
+        brand_safety_tags: data.brand_safety_tags?.length ? data.brand_safety_tags : f.brand_safety_tags,
+      }));
+    } catch (e) { onError(`Extraction failed: ${e.message}`); }
+    finally { setExtracting(false); }
+  };
+
   const submit = async () => {
     try {
       const body = [{
@@ -75,8 +98,36 @@ function CreateAdModal({ campaignId, onClose, onSuccess, onError }) {
       onSuccess();
     } catch (e) { onError(e.message); }
   };
+
   return (
     <Modal title="New Ad" onClose={onClose} width={600}>
+      {/* URL extraction */}
+      <div style={{
+        background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.2)",
+        borderRadius: 8, padding: "12px 14px", marginBottom: 20,
+      }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: "#f59e0b", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+          <Link size={12} /> Fill from product URL
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input
+            style={{ ...inputStyle, flex: 1, fontSize: 13 }}
+            value={urlInput}
+            onChange={e => setUrlInput(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && extractFromUrl()}
+            placeholder="https://store.example.com/product/..."
+            disabled={extracting}
+          />
+          <button
+            style={{ ...btnPrimary, whiteSpace: "nowrap", opacity: extracting ? 0.6 : 1 }}
+            onClick={extractFromUrl}
+            disabled={extracting || !urlInput.trim()}
+          >
+            {extracting ? "Extracting…" : "Extract"}
+          </button>
+        </div>
+      </div>
+
       <FormField label="Product Name"><input style={inputStyle} value={form.product_name} onChange={e => set("product_name", e.target.value)} placeholder="Nike Pegasus 41" /></FormField>
       <FormField label="Product Description"><textarea style={{ ...inputStyle, minHeight: 60, resize: "vertical" }} value={form.product_description} onChange={e => set("product_description", e.target.value)} placeholder="Brief product description..." /></FormField>
       <FormField label="Creative Text"><textarea style={{ ...inputStyle, minHeight: 60, resize: "vertical" }} value={form.creative_text} onChange={e => set("creative_text", e.target.value)} placeholder="The ad copy the LLM will work with..." /></FormField>
