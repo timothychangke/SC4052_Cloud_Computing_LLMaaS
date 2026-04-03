@@ -22,6 +22,12 @@ export const ctrColor = (ctr) => {
   return "#f87171";
 };
 
+export const scoreColor = (score) => {
+  if (score >= 0.7) return "#34d399";
+  if (score >= 0.4) return "#f59e0b";
+  return "#f87171";
+};
+
 // ── Status color map ────────────────────────────────────────────
 export const statusColor = {
   active: { bg: "rgba(52,211,153,0.12)", text: "#34d399", border: "rgba(52,211,153,0.25)" },
