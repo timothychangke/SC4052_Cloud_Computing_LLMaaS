@@ -171,6 +171,31 @@ BEGIN
             CREATE INDEX idx_daily_spend_campaign ON daily_spend_log(campaign_id, spend_date);
         END IF;
     END$$;
+
+    -- ── Ad context for adaptive optimization ────────────────────────────────
+    ALTER TABLE ads ADD COLUMN IF NOT EXISTS ad_context TEXT DEFAULT '';
+    ALTER TABLE ads ADD COLUMN IF NOT EXISTS ad_context_version INT DEFAULT 0;
+    ALTER TABLE ads ADD COLUMN IF NOT EXISTS ad_context_updated_at TIMESTAMPTZ;
+
+    -- ── Ad context history table ────────────────────────────────────────────
+    CREATE TABLE IF NOT EXISTS ad_context_history (
+        id SERIAL PRIMARY KEY,
+        ad_id UUID REFERENCES ads(ad_id),
+        version INT NOT NULL,
+        context_text TEXT NOT NULL,
+        optimization_reasoning TEXT,
+        metrics_snapshot JSONB,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    DO $$
+    BEGIN
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_indexes WHERE indexname = 'idx_context_history_ad'
+        ) THEN
+            CREATE INDEX idx_context_history_ad ON ad_context_history(ad_id);
+        END IF;
+    END$$;
     """
 
 async def _run_migrations():
