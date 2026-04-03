@@ -62,7 +62,7 @@ async def _embed(text: str) -> list[float]:
     return vec.tolist()
 
 
-# ── Contract 1: Context Extraction ──────────────────────────────────────
+# ── Context Extraction ──────────────────────────────────────
 
 async def real_extract_context(message: str, history: list[Turn]) -> ContextObject:
     """
@@ -114,7 +114,7 @@ Latest user message: {message}"""
     )
 
 
-# ── Contract 2: Query Embedding ─────────────────────────────────────────
+# ── Query Embedding ─────────────────────────────────────────
 
 async def real_embed_query(context: ContextObject) -> list[float]:
     """Embed the query context as a 768-dim vector for pgvector search."""
@@ -127,7 +127,7 @@ async def real_embed_query(context: ContextObject) -> list[float]:
     return await _embed(text)
 
 
-# ── Contract 3: Ad Embedding (ingestion time) ───────────────────────────
+# ── Ad Embedding (ingestion time) ───────────────────────────
 
 async def real_embed_ad(
     product_name: str,
@@ -179,7 +179,42 @@ Target intents: {', '.join(target_intents)}"""
     return await _embed(keyword_text)
 
 
-# ── Contract 5: Response Synthesis ──────────────────────────────────────
+# ── Initial Context Generation ────────────────────────────────
+
+async def real_generate_initial_context(ad: Ad) -> str:
+    """
+    Generate the initial context.md for an ad based on its static fields.
+    Called once at ad creation time.
+    """
+    prompt = f"""You are an advertising strategist for a conversational AI platform.
+Given the following ad details, write a concise context guide (3-5 bullet points)
+that will help an AI assistant naturally recommend this product in conversation.
+
+Focus on:
+- The most compelling angle to introduce this product
+- The tone and framing that would feel natural (not salesy)
+- Key differentiators to highlight
+- What user intents/situations this product is best suited for
+- What to avoid (e.g., don't oversell, don't compare negatively to competitors)
+
+Ad Details:
+- Product: {ad.product_name}
+- Description: {ad.product_description}
+- Creative Text: {ad.creative_text}
+- Target Topics: {', '.join(ad.target_topics)}
+- Target Intents: {', '.join(ad.target_intents)}
+
+Return ONLY the context guide as plain text bullet points. No preamble."""
+
+    resp = await _get_groq().chat.completions.create(
+        model=_CHAT_MODEL,
+        max_tokens=512,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return resp.choices[0].message.content.strip()
+
+
+# ── Response Synthesis ──────────────────────────────────────
 
 async def real_generate_response(
     message: str,
@@ -211,13 +246,22 @@ async def real_generate_response(
     if ads and context.ad_receptivity in (AdReceptivity.HIGH, AdReceptivity.MEDIUM):
         chosen_ad = ads[0]
         url = tracking_urls.get(chosen_ad.ad_id, chosen_ad.cta_url)
-        messages[0]["content"] += (
+
+        sponsored_block = (
             f"\n\nYou MUST include exactly one sponsored product mention in your response. "
             f"Format it as markdown: [Sponsored] The [{chosen_ad.product_name}]({url}) — <one compelling reason>. "
             f"Ad details — Product: {chosen_ad.product_name}. "
             f"Description: {chosen_ad.product_description}. "
             f"Creative: {chosen_ad.creative_text}."
         )
+
+        ad_context = getattr(chosen_ad, 'ad_context', '') or ''
+        if ad_context:
+            sponsored_block += (
+                f"\n\nPresentation guidance for this product:\n{ad_context}"
+            )
+
+        messages[0]["content"] += sponsored_block
 
     messages.append({"role": "user", "content": message})
 
@@ -243,7 +287,7 @@ async def real_generate_response(
     )
 
 
-# ── Contract 7: Product Extraction from URL ─────────────────────────────
+# ── Product Extraction from URL ─────────────────────────────
 
 async def real_extract_product_from_url(page_text: str) -> dict:
     """
@@ -279,7 +323,7 @@ Webpage content:
     return json.loads(raw)
 
 
-# ── Contract 6: Engagement Detection ────────────────────────────────────
+# ── Engagement Detection ────────────────────────────────────
 
 async def real_detect_engagement(
     follow_up_message: str,

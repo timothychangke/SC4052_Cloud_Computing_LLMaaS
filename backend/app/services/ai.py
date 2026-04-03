@@ -87,3 +87,12 @@ async def detect_engagement(
     else:
         from app.services.ai_mock import mock_detect_engagement
         return await mock_detect_engagement(follow_up_message, shown_ad, assistant_response, history)
+
+async def generate_initial_context(ad: Ad) -> str:
+    settings = get_settings()
+    if settings.ai_module_mode == "real":
+        from app.services.ai_real import real_generate_initial_context
+        return await real_generate_initial_context(ad)
+    else:
+        from app.services.ai_mock import mock_generate_initial_context
+        return await mock_generate_initial_context(ad)

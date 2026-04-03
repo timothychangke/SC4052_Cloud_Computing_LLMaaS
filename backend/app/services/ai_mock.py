@@ -16,7 +16,7 @@ from app.models.schemas import (
     EngagementMetrics, EngagementType,
 )
 
-# ── Contract 1: Context Extraction ──────────────────────────────────────
+# ── Context Extraction ──────────────────────────────────────
 
 async def mock_extract_context(message: str, history: list[Turn]) -> ContextObject:
     """
@@ -33,14 +33,14 @@ async def mock_extract_context(message: str, history: list[Turn]) -> ContextObje
     )
 
 
-# ── Contract 2: Query Embedding ─────────────────────────────────────────
+# ── Query Embedding ─────────────────────────────────────────
 
 async def mock_embed_query(context: ContextObject) -> list[float]:
     """Return a random 1536-dim vector.  Good enough for wiring tests."""
     return [random.uniform(-1, 1) for _ in range(1536)]
 
 
-# ── Contract 3: Ad Embedding (ingestion time) ───────────────────────────
+# ── Ad Embedding (ingestion time) ───────────────────────────
 
 async def mock_embed_ad(
     product_name: str,
@@ -51,8 +51,20 @@ async def mock_embed_ad(
     """Same idea — random vector so we can test the ingestion pipeline."""
     return [random.uniform(-1, 1) for _ in range(1536)]
 
+# ── Initial Context Generation (mock) ─────────────────────────
 
-# ── Contract 5: Response Synthesis ──────────────────────────────────────
+async def mock_generate_initial_context(ad: Ad) -> str:
+    """Return a canned context guide for testing."""
+    return (
+        f"• Lead with {ad.product_name}'s key differentiator in a helpful, conversational tone\n"
+        f"• Best suited when user is researching or comparing products in this category\n"
+        f"• Emphasize genuine value — don't oversell or use hyperbolic language\n"
+        f"• Avoid negative comparisons with competitor products\n"
+        f"• Keep the mention brief and integrated into the broader helpful response"
+    )
+
+
+# ── Response Synthesis ──────────────────────────────────────
 
 async def mock_generate_response(
     message: str,
@@ -88,7 +100,7 @@ async def mock_generate_response(
     )
 
 
-# ── Contract 7: Product Extraction from URL ─────────────────────────────
+# ── Product Extraction from URL ─────────────────────────────
 
 async def mock_extract_product_from_url(page_text: str) -> dict:
     """Returns canned product data for testing the extraction pipeline."""
@@ -102,7 +114,7 @@ async def mock_extract_product_from_url(page_text: str) -> dict:
     }
 
 
-# ── Contract 6: Engagement Detection ────────────────────────────────────
+# ── Engagement Detection ────────────────────────────────────
 
 async def mock_detect_engagement(
     follow_up_message: str,
