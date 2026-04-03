@@ -44,6 +44,17 @@ class AdvertiserStatus(str, Enum):
     ACTIVE = "active"
     SUSPENDED = "suspended"
 
+class EngagementType(str, Enum):
+    PRODUCT_INQUIRY = "product_inquiry"
+    COMPARISON = "comparison"
+    PRICE_INQUIRY = "price_inquiry"
+    PURCHASE_INTENT = "purchase_intent"
+    FEATURE_QUESTION = "feature_question"
+    POSITIVE_REACTION = "positive_reaction"
+    NEGATIVE_REACTION = "negative_reaction"
+    DISMISSAL = "dismissal"
+    NONE = "none"
+
 
 # ── Core domain objects (dataclasses for internal use) ───────────────────
 
@@ -88,6 +99,16 @@ class ResponseObject:
     ad_included: bool
     ad_id_used: Optional[str] = None
 
+@dataclass
+class EngagementMetrics:
+    engaged: bool
+    engagement_type: EngagementType
+    engagement_score: float              # 0.0–1.0
+    sentiment_toward_ad: str             # "positive", "neutral", "negative"
+    ad_naturalness_score: float          # 0.0–1.0
+    purchase_proximity: float            # 0.0–1.0
+    follow_up_topic_match: bool
+    reasoning: str                       
 
 # ── Pydantic schemas for API request / response validation ──────────────
 
