@@ -57,4 +57,42 @@ export const MOCK = {
     { ad_id: "ad_002", advertiser_id: "adv_nike", product_name: "Nike Air Max 270", product_description: "Iconic lifestyle sneaker with Max Air unit for all-day comfort.", target_topics: ["sneakers", "lifestyle", "fashion"], target_intents: ["product_research", "purchase"], creative_text: "Step into comfort with the Nike Air Max 270.", cta_url: "https://nike.com/air-max-270", bid_cpm: 10.00, budget_remaining: 3200, brand_safety_tags: ["fashion", "lifestyle"], active: true, created_at: "2025-03-16T11:00:00", updated_at: "2025-03-16T11:00:00" },
     { ad_id: "ad_003", advertiser_id: "adv_nike", product_name: "Nike Dri-FIT ADV", product_description: "Advanced moisture-wicking running shirt.", target_topics: ["running apparel", "sportswear"], target_intents: ["product_research"], creative_text: "Stay cool and dry with Nike Dri-FIT ADV technology.", cta_url: "https://nike.com/dri-fit", bid_cpm: 8.00, budget_remaining: 0, brand_safety_tags: ["sports"], active: false, created_at: "2025-03-17T09:30:00", updated_at: "2025-03-18T15:00:00" },
   ],
+  // After the ads array closing bracket "]," add:
+
+  engagementByAd: [
+    {
+      ad_id: "ad_001", product_name: "Nike Pegasus 41", total_engagements: 89,
+      avg_engagement_score: 0.72, avg_naturalness_score: 0.81, avg_purchase_proximity: 0.45,
+      product_inquiries: 32, comparisons: 18, price_inquiries: 12, purchase_intents: 8,
+      negative_reactions: 5, dismissals: 14,
+      positive_sentiment: 52, negative_sentiment: 12, topic_matches: 61,
+    },
+    {
+      ad_id: "ad_002", product_name: "Sony WH-1000XM5", total_engagements: 65,
+      avg_engagement_score: 0.65, avg_naturalness_score: 0.74, avg_purchase_proximity: 0.38,
+      product_inquiries: 22, comparisons: 15, price_inquiries: 10, purchase_intents: 5,
+      negative_reactions: 3, dismissals: 10,
+      positive_sentiment: 40, negative_sentiment: 8, topic_matches: 44,
+    },
+    {
+      ad_id: "ad_003", product_name: "Dyson V15 Detect", total_engagements: 52,
+      avg_engagement_score: 0.58, avg_naturalness_score: 0.69, avg_purchase_proximity: 0.51,
+      product_inquiries: 18, comparisons: 8, price_inquiries: 14, purchase_intents: 6,
+      negative_reactions: 2, dismissals: 4,
+      positive_sentiment: 38, negative_sentiment: 5, topic_matches: 40,
+    },
+  ],
+  engagementTimeseries: (days) => {
+    const data = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      data.push({
+        date: d.toISOString().split("T")[0],
+        engagements: 8 + Math.floor(Math.random() * 20),
+        avg_score: +(0.5 + Math.random() * 0.35).toFixed(3),
+        avg_naturalness: +(0.55 + Math.random() * 0.3).toFixed(3),
+      });
+    }
+    return data;
+  },
 };
