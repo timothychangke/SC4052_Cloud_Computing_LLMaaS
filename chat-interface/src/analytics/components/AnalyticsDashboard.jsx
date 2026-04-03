@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { LayoutDashboard, Users } from "lucide-react";
+import { LayoutDashboard, Users, Activity } from "lucide-react";
 import { DashboardPage } from "../pages/DashboardPage";
 import { AdvertisersPage } from "../pages/AdvertisersPage";
 import { AdvertiserDetailPage } from "../pages/AdvertiserDetailPage";
 import { CampaignDetailPage } from "../pages/CampaignDetailPage";
+import { EngagementPage } from "../pages/EngagementPage";
 
 const GLOBAL_STYLES = `
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -26,6 +27,7 @@ const GLOBAL_STYLES = `
 
 const NAV_ITEMS = [
   { id: "dashboard", icon: LayoutDashboard, label: "Dashboard" },
+  { id: "engagement", icon: Activity, label: "Engagement" },
   { id: "advertisers", icon: Users, label: "Advertisers" },
 ];
 
@@ -37,6 +39,7 @@ export default function AnalyticsDashboard() {
     switch (route.page) {
       case "dashboard": return <DashboardPage />;
       case "advertisers": return <AdvertisersPage navigate={navigate} />;
+      case "engagement": return <EngagementPage />;
       case "advertiser": return <AdvertiserDetailPage advertiserId={route.params.advertiserId} navigate={navigate} />;
       case "campaign": return <CampaignDetailPage campaignId={route.params.campaignId} advertiserId={route.params.advertiserId} navigate={navigate} />;
       default: return <DashboardPage />;
