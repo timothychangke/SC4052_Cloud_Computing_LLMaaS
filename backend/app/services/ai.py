@@ -10,7 +10,7 @@ flip the env var.  Nothing else in the codebase needs to change.
 from __future__ import annotations
 
 from app.core.config import get_settings
-from app.models.schemas import Ad, ContextObject, ResponseObject, Turn
+from app.models.schemas import Ad, ContextObject, EngagementMetrics, ResponseObject, Turn
 
 
 async def extract_context(message: str, history: list[Turn]) -> ContextObject:
@@ -74,11 +74,16 @@ async def extract_product_from_url(page_text: str) -> dict:
         return await mock_extract_product_from_url(page_text)
 
 
-async def detect_engagement(follow_up_message: str, shown_ad: Ad) -> bool:
+async def detect_engagement(
+    follow_up_message: str,
+    shown_ad: Ad,
+    assistant_response: str = "",
+    history: list[Turn] | None = None,
+) -> EngagementMetrics:
     settings = get_settings()
     if settings.ai_module_mode == "real":
         from app.services.ai_real import real_detect_engagement
-        return await real_detect_engagement(follow_up_message, shown_ad)
+        return await real_detect_engagement(follow_up_message, shown_ad, assistant_response, history)
     else:
         from app.services.ai_mock import mock_detect_engagement
-        return await mock_detect_engagement(follow_up_message, shown_ad)
+        return await mock_detect_engagement(follow_up_message, shown_ad, assistant_response, history)
