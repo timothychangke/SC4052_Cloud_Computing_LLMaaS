@@ -52,6 +52,8 @@ async def get_candidate_ads(
             bid_cpm,
             budget_remaining,
             brand_safety_tags,
+            ad_context,
+            ad_context_version,
             1 - (embedding <=> $1::vector) AS similarity
         FROM ads
         WHERE active = true
@@ -98,6 +100,8 @@ async def get_candidate_ads(
                 budget_remaining=float(r["budget_remaining"]),
                 brand_safety_tags=r["brand_safety_tags"] or [],
                 similarity=float(r["similarity"]),
+                ad_context=r["ad_context"] or "",
+                ad_context_version=r["ad_context_version"] or 0,
             )
         )
 
