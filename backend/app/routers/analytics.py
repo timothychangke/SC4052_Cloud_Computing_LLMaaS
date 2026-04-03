@@ -81,3 +81,80 @@ async def analytics_summary(days: int = Query(7, ge=1, le=90)):
         estimated_revenue=round(estimated_revenue, 2),
         top_ads=[dict(r) for r in top_rows],
     )
+
+@router.get("/engagement")
+async def engagement_analytics(
+    days: int = Query(7, ge=1, le=90),
+    ad_id: str | None = Query(None),
+):
+    """Aggregated engagement metrics per ad, for the dashboard."""
+    pool = get_pg()
+
+    rows = await pool.fetch(
+        """
+        SELECT
+            e.ad_id::text AS ad_id,
+            a.product_name,
+            COUNT(*) AS total_engagements,
+            AVG((e.payload->>'engagement_score')::float) AS avg_engagement_score,
+            AVG((e.payload->>'ad_naturalness_score')::float) AS avg_naturalness_score,
+            AVG((e.payload->>'purchase_proximity')::float) AS avg_purchase_proximity,
+            COUNT(*) FILTER (WHERE e.payload->>'engagement_type' = 'product_inquiry') AS product_inquiries,
+            COUNT(*) FILTER (WHERE e.payload->>'engagement_type' = 'comparison') AS comparisons,
+            COUNT(*) FILTER (WHERE e.payload->>'engagement_type' = 'price_inquiry') AS price_inquiries,
+            COUNT(*) FILTER (WHERE e.payload->>'engagement_type' = 'purchase_intent') AS purchase_intents,
+            COUNT(*) FILTER (WHERE e.payload->>'engagement_type' = 'negative_reaction') AS negative_reactions,
+            COUNT(*) FILTER (WHERE e.payload->>'engagement_type' = 'dismissal') AS dismissals,
+            COUNT(*) FILTER (WHERE e.payload->>'sentiment_toward_ad' = 'positive') AS positive_sentiment,
+            COUNT(*) FILTER (WHERE e.payload->>'sentiment_toward_ad' = 'negative') AS negative_sentiment,
+            COUNT(*) FILTER (WHERE (e.payload->>'follow_up_topic_match')::bool = true) AS topic_matches
+        FROM events e
+        JOIN ads a ON e.ad_id = a.ad_id
+        WHERE e.event_type = 'engagement'
+          AND e.created_at > NOW() - ($1 || ' days')::interval
+          AND ($2::text IS NULL OR e.ad_id::text = $2)
+        GROUP BY e.ad_id, a.product_name
+        ORDER BY total_engagements DESC
+        """,
+        str(days),
+        ad_id,
+    )
+
+    return [dict(r) for r in rows]
+
+
+@router.get("/engagement/timeseries")
+async def engagement_timeseries(
+    days: int = Query(7, ge=1, le=90),
+    ad_id: str | None = Query(None),
+):
+    """Daily engagement metrics for chart visualization."""
+    pool = get_pg()
+
+    rows = await pool.fetch(
+        """
+        SELECT
+            DATE(e.created_at) AS date,
+            COUNT(*) AS engagements,
+            AVG((e.payload->>'engagement_score')::float) AS avg_score,
+            AVG((e.payload->>'ad_naturalness_score')::float) AS avg_naturalness
+        FROM events e
+        WHERE e.event_type = 'engagement'
+          AND e.created_at > NOW() - ($1 || ' days')::interval
+          AND ($2::text IS NULL OR e.ad_id::text = $2)
+        GROUP BY DATE(e.created_at)
+        ORDER BY date
+        """,
+        str(days),
+        ad_id,
+    )
+
+    return [
+        {
+            "date": str(r["date"]),
+            "engagements": r["engagements"],
+            "avg_score": round(float(r["avg_score"] or 0), 3),
+            "avg_naturalness": round(float(r["avg_naturalness"] or 0), 3),
+        }
+        for r in rows
+    ]

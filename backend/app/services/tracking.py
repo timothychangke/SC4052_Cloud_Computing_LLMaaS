@@ -15,6 +15,7 @@ import structlog
 
 from app.core.config import get_settings
 from app.core.db import get_pg
+from app.models.schemas import EngagementMetrics
 
 log = structlog.get_logger()
 
@@ -109,9 +110,30 @@ async def log_click(session_id: str, ad_id: str, cta_url: str):
     log.info("event.click", session_id=session_id, ad_id=ad_id)
 
 
-async def log_engagement(session_id: str, ad_id: str, follow_up_message: str):
-    """Called when the engagement classifier says the user asked about the product."""
+async def log_engagement(
+    session_id: str,
+    ad_id: str,
+    follow_up_message: str,
+    metrics: "EngagementMetrics | None" = None,
+):
+    """Called when the engagement classifier detects engagement with a product."""
     pool = get_pg()
+
+    payload = {
+        "follow_up_message": follow_up_message,
+        "timestamp": _now_iso(),
+    }
+    if metrics:
+        payload.update({
+            "engagement_type": metrics.engagement_type.value,
+            "engagement_score": metrics.engagement_score,
+            "sentiment_toward_ad": metrics.sentiment_toward_ad,
+            "ad_naturalness_score": metrics.ad_naturalness_score,
+            "purchase_proximity": metrics.purchase_proximity,
+            "follow_up_topic_match": metrics.follow_up_topic_match,
+            "reasoning": metrics.reasoning,
+        })
+
     await pool.execute(
         """
         INSERT INTO events (event_type, session_id, ad_id, payload)
@@ -120,6 +142,6 @@ async def log_engagement(session_id: str, ad_id: str, follow_up_message: str):
         "engagement",
         session_id,
         ad_id,
-        json.dumps({"follow_up_message": follow_up_message, "timestamp": _now_iso()}),
+        json.dumps(payload),
     )
     log.info("event.engagement", session_id=session_id, ad_id=ad_id)

@@ -13,8 +13,8 @@ from __future__ import annotations
 import random
 from app.models.schemas import (
     Ad, ContextObject, Intent, AdReceptivity, ResponseObject, Turn,
+    EngagementMetrics, EngagementType,
 )
-
 
 # ── Contract 1: Context Extraction ──────────────────────────────────────
 
@@ -104,11 +104,26 @@ async def mock_extract_product_from_url(page_text: str) -> dict:
 
 # ── Contract 6: Engagement Detection ────────────────────────────────────
 
-async def mock_detect_engagement(follow_up_message: str, shown_ad: Ad) -> bool:
+async def mock_detect_engagement(
+    follow_up_message: str,
+    shown_ad: Ad,
+    assistant_response: str = "",
+    history: list[Turn] | None = None,
+) -> EngagementMetrics:
     """
-    Dead-simple keyword check.  The real version might use an LLM call,
-    but this is fine for testing the engagement logging pipeline.
+    Keyword-based mock that returns full EngagementMetrics.
     """
     msg_lower = follow_up_message.lower()
     product_words = shown_ad.product_name.lower().split()
-    return any(word in msg_lower for word in product_words if len(word) > 2)
+    engaged = any(word in msg_lower for word in product_words if len(word) > 2)
+
+    return EngagementMetrics(
+        engaged=engaged,
+        engagement_type=EngagementType.PRODUCT_INQUIRY if engaged else EngagementType.NONE,
+        engagement_score=0.8 if engaged else 0.1,
+        sentiment_toward_ad="positive" if engaged else "neutral",
+        ad_naturalness_score=0.7,
+        purchase_proximity=0.5 if engaged else 0.1,
+        follow_up_topic_match=engaged,
+        reasoning="Mock: keyword match" if engaged else "Mock: no keyword match",
+    )
