@@ -19,6 +19,8 @@ from app.core.db import get_pg
 from app.models.schemas import AdCreatePayload, AdUpdatePayload
 from app.services.ai import embed_ad
 
+import json
+
 log = structlog.get_logger()
 router = APIRouter(prefix="/admin/ads", tags=["admin"])
 
@@ -144,3 +146,38 @@ async def delete_ad(ad_id: str):
     if result == "UPDATE 0":
         raise HTTPException(status_code=404, detail="Ad not found")
     return {"deleted": ad_id}
+
+# ── Context Optimization ─────────────────────────────────────────────────
+
+@router.post("/{ad_id}/optimize-context")
+async def trigger_context_optimization(ad_id: str):
+    """Manually trigger context optimization for a single ad."""
+    from app.services.context_optimizer import optimize_ad_context
+    new_context = await optimize_ad_context(ad_id)
+    if new_context is None:
+        return {"ad_id": ad_id, "status": "skipped", "reason": "Insufficient data or too soon since last optimization"}
+    return {"ad_id": ad_id, "status": "optimized", "new_context": new_context}
+
+
+@router.get("/{ad_id}/context-history")
+async def get_context_history(ad_id: str):
+    """Fetch the optimization history for an ad's context."""
+    pool = get_pg()
+    rows = await pool.fetch("""
+        SELECT version, context_text, optimization_reasoning,
+               metrics_snapshot, created_at
+        FROM ad_context_history
+        WHERE ad_id = $1::uuid
+        ORDER BY version DESC
+        LIMIT 20
+    """, ad_id)
+    return [
+        {
+            "version": r["version"],
+            "context_text": r["context_text"],
+            "optimization_reasoning": r["optimization_reasoning"],
+            "metrics_snapshot": json.loads(r["metrics_snapshot"]) if r["metrics_snapshot"] else None,
+            "created_at": str(r["created_at"]),
+        }
+        for r in rows
+    ]
