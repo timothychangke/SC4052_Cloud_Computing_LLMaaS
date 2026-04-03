@@ -21,6 +21,7 @@ from sentence_transformers import SentenceTransformer
 from app.core.config import get_settings
 from app.models.schemas import (
     Ad, ContextObject, Intent, AdReceptivity, ResponseObject, Turn,
+    EngagementMetrics, EngagementType,
 )
 
 _CHAT_MODEL  = "llama-3.3-70b-versatile"
@@ -280,25 +281,68 @@ Webpage content:
 
 # ── Contract 6: Engagement Detection ────────────────────────────────────
 
-async def real_detect_engagement(follow_up_message: str, shown_ad: Ad) -> bool:
+async def real_detect_engagement(
+    follow_up_message: str,
+    shown_ad: Ad,
+    assistant_response: str = "",
+    history: list[Turn] | None = None,
+) -> EngagementMetrics:
     """
-    Asks Groq LLM whether the user's follow-up message indicates engagement
-    with the previously shown sponsored product.
+    Asks Groq LLM to evaluate detailed engagement metrics
+    for the user's follow-up after a sponsored ad was shown.
     """
+    history_snippet = ""
+    if history:
+        history_snippet = "\n".join(
+            f"{t.role}: {t.content}" for t in history[-4:]
+        )
+
+    prompt = f"""Analyse whether the user engaged with the advertised product in their follow-up message.
+
+    Advertised product: {shown_ad.product_name}
+    Product description: {shown_ad.product_description}
+
+    {"Assistant response that contained the ad:" if assistant_response else ""}
+    {assistant_response}
+
+    {"Recent conversation context:" if history_snippet else ""}
+    {history_snippet}
+
+    User's follow-up message: {follow_up_message}
+
+    Return a JSON object with EXACTLY these fields — no extra text:
+
+    {{
+      "engaged": <true or false>,
+      "engagement_type": "<one of: product_inquiry, comparison, price_inquiry, purchase_intent, feature_question, positive_reaction, negative_reaction, dismissal, none>",
+      "engagement_score": <float 0.0-1.0, how strongly the user engaged>,
+      "sentiment_toward_ad": "<one of: positive, neutral, negative>",
+      "ad_naturalness_score": <float 0.0-1.0, how natural/non-intrusive the ad felt based on user reaction>,
+      "purchase_proximity": <float 0.0-1.0, how close the user seems to making a purchase>,
+      "follow_up_topic_match": <true if user stayed on the product topic, false otherwise>,
+      "reasoning": "<one sentence explaining your assessment>"
+    }}"""
+
     resp = await _get_groq().chat.completions.create(
         model=_CHAT_MODEL,
-        max_tokens=10,
-        messages=[
-            {
-                "role": "user",
-                "content": (
-                    f"Did the user show interest in or engage with the advertised product?\n\n"
-                    f"Advertised product: {shown_ad.product_name}\n"
-                    f"User's follow-up: {follow_up_message}\n\n"
-                    f'Reply with exactly one word: "yes" or "no".'
-                ),
-            }
-        ],
+        max_tokens=512,
+        messages=[{"role": "user", "content": prompt}],
     )
 
-    return resp.choices[0].message.content.strip().lower().startswith("yes")
+    raw = resp.choices[0].message.content.strip()
+    if raw.startswith("```"):
+        parts = raw.split("```")
+        raw = parts[1].lstrip("json").strip() if len(parts) > 1 else raw
+
+    data = json.loads(raw)
+
+    return EngagementMetrics(
+        engaged=bool(data.get("engaged", False)),
+        engagement_type=EngagementType(data.get("engagement_type", "none")),
+        engagement_score=float(data.get("engagement_score", 0.0)),
+        sentiment_toward_ad=data.get("sentiment_toward_ad", "neutral"),
+        ad_naturalness_score=float(data.get("ad_naturalness_score", 0.5)),
+        purchase_proximity=float(data.get("purchase_proximity", 0.0)),
+        follow_up_topic_match=bool(data.get("follow_up_topic_match", False)),
+        reasoning=data.get("reasoning", ""),
+    )
