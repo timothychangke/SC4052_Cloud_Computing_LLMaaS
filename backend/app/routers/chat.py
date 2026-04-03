@@ -34,6 +34,7 @@ from app.core.exceptions import (
     EmbeddingError,
     ResponseGenerationError,
 )
+from app.models.schemas import Turn
 
 log = structlog.get_logger()
 router = APIRouter()
@@ -214,10 +215,29 @@ async def _maybe_detect_engagement(
             brand_safety_tags=row["brand_safety_tags"] or [],
         )
 
-        engaged = await ai.detect_engagement(current_message, shown_ad)
-        if engaged:
-            await tracking.log_engagement(session_id, ad_id, current_message)
-            log.info("chat.engagement_detected", session_id=session_id, ad_id=ad_id)
+        metrics = await ai.detect_engagement(
+            current_message,
+            shown_ad,
+            assistant_response=last_turn.get("content", ""),
+            history=[
+                Turn(
+                    role=t["role"],
+                    content=t["content"],
+                    timestamp=t.get("timestamp", ""),
+                    ad_id=t.get("ad_id"),
+                )
+                for t in turns[-4:]
+            ],
+        )
+        if metrics.engaged:
+            await tracking.log_engagement(session_id, ad_id, current_message, metrics=metrics)
+            log.info(
+                "chat.engagement_detected",
+                session_id=session_id,
+                ad_id=ad_id,
+                engagement_type=metrics.engagement_type.value,
+                engagement_score=metrics.engagement_score,
+            )
 
     except Exception as exc:
         # engagement detection is nice-to-have — never crash the request over it
