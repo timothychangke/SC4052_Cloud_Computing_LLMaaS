@@ -501,6 +501,34 @@ async def create_campaign_ads(campaign_id: str, ads: list[CampaignAdCreatePayloa
         created_ids.append(row["ad_id"])
         log.info("portal.ad_created", ad_id=row["ad_id"],
                  campaign_id=campaign_id, product=ad.product_name)
+        
+        # Generate initial ad context asynchronously (best-effort)
+        try:
+            from app.services.ai import generate_initial_context
+            from app.models.schemas import Ad as AdSchema
+            temp_ad = AdSchema(
+                ad_id=row["ad_id"],
+                advertiser_id=advertiser_id,
+                product_name=ad.product_name,
+                product_description=ad.product_description,
+                target_topics=ad.target_topics,
+                target_intents=ad.target_intents,
+                creative_text=ad.creative_text,
+                cta_url=ad.cta_url,
+                bid_cpm=ad.bid_cpm,
+                budget_remaining=ad.budget_remaining,
+                brand_safety_tags=ad.brand_safety_tags,
+            )
+            initial_context = await generate_initial_context(temp_ad)
+            await pool.execute(
+                """UPDATE ads SET ad_context = $1, ad_context_version = 1,
+                   ad_context_updated_at = NOW() WHERE ad_id = $2::uuid""",
+                initial_context, row["ad_id"],
+            )
+            log.info("portal.ad_context_generated", ad_id=row["ad_id"])
+        except Exception as exc:
+            log.warning("portal.ad_context_generation_failed",
+                        ad_id=row["ad_id"], error=str(exc))
 
     return {"created": len(created_ids), "ad_ids": created_ids}
 

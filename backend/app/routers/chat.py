@@ -192,7 +192,8 @@ async def _maybe_detect_engagement(
             """
             SELECT ad_id::text, advertiser_id, product_name, product_description,
                    target_topics, target_intents, creative_text, cta_url,
-                   bid_cpm, budget_remaining, brand_safety_tags
+                   bid_cpm, budget_remaining, brand_safety_tags,
+                   ad_context, ad_context_version
             FROM ads WHERE ad_id = $1::uuid
             """,
             ad_id,
@@ -213,6 +214,8 @@ async def _maybe_detect_engagement(
             bid_cpm=float(row["bid_cpm"]),
             budget_remaining=float(row["budget_remaining"]),
             brand_safety_tags=row["brand_safety_tags"] or [],
+            ad_context=row["ad_context"] or "",
+            ad_context_version=row["ad_context_version"] or 0,
         )
 
         metrics = await ai.detect_engagement(

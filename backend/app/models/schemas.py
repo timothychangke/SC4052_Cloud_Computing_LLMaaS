@@ -91,6 +91,8 @@ class Ad:
     brand_safety_tags: list[str]
     similarity: Optional[float] = None   # filled after vector search
     score: Optional[float] = None        # filled after re-ranking
+    ad_context: str = ""                 # dynamic context guide for response synthesis
+    ad_context_version: int = 0          # how many times optimised
 
 
 @dataclass
