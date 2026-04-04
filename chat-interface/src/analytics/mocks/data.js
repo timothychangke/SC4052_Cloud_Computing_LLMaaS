@@ -95,4 +95,27 @@ export const MOCK = {
     }
     return data;
   },
+  contextHistory: (adId) => [
+    {
+      version: 3,
+      context_text: "• Lead with Pegasus 41's ZoomX foam when user mentions daily training or comfort\n• Use casual tone — 'you might like' not 'you should buy'\n• Mention one specific feature matching the user's stated need\n• Avoid price comparisons — let the product speak for itself\n• Only mention when conversation is clearly about running shoes",
+      optimization_reasoning: "Naturalness score was low (0.52). Adjusted tone from assertive to peer-recommendation style. Added specificity to feature matching based on high dismissal rate when product wasn't relevant to the query.",
+      metrics_snapshot: { impressions: 245, total_engagements: 38, avg_engagement_score: 0.68, avg_naturalness: 0.72, avg_purchase_proximity: 0.41, positive_count: 24, negative_count: 5, engagement_rate: 15.5 },
+      created_at: "2025-04-01T14:30:00",
+    },
+    {
+      version: 2,
+      context_text: "• Highlight responsive ZoomX foam as the key differentiator\n• Best for users researching running shoes or comparing options\n• Keep mention brief and helpful — avoid sounding like an ad\n• Don't compare negatively to other brands",
+      optimization_reasoning: "Engagement score improved but purchase proximity remained low. Added guidance to connect product features to user's specific stated needs rather than generic benefits.",
+      metrics_snapshot: { impressions: 180, total_engagements: 22, avg_engagement_score: 0.55, avg_naturalness: 0.52, avg_purchase_proximity: 0.33, positive_count: 14, negative_count: 4, engagement_rate: 12.2 },
+      created_at: "2025-03-25T10:15:00",
+    },
+    {
+      version: 1,
+      context_text: "• Lead with Nike Pegasus 41's key differentiator in a helpful, conversational tone\n• Best suited when user is researching or comparing running shoes\n• Emphasize genuine value — don't oversell\n• Avoid negative comparisons with competitor products",
+      optimization_reasoning: "Initial context generated from ad fields.",
+      metrics_snapshot: null,
+      created_at: "2025-03-18T09:00:00",
+    },
+  ],
 };
