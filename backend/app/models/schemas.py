@@ -93,6 +93,7 @@ class Ad:
     score: Optional[float] = None        # filled after re-ranking
     ad_context: str = ""                 # dynamic context guide for response synthesis
     ad_context_version: int = 0          # how many times optimised
+    product_image_url: Optional[str] = None  # product photo for image generation
 
 
 @dataclass
@@ -149,6 +150,17 @@ class AdUpdatePayload(BaseModel):
     active: Optional[bool] = None
     creative_text: Optional[str] = None
     bid_cpm: Optional[float] = None
+
+
+class ImageGenerateRequest(BaseModel):
+    prompt: str = Field(..., min_length=1, max_length=1000)
+    session_id: str = Field(..., min_length=1, max_length=128)
+
+
+class ImageGenerateResponse(BaseModel):
+    image_url: Optional[str]
+    enhanced_prompt: str
+    ad_metadata: Optional[AdMetadata] = None
 
 
 class AnalyticsSummary(BaseModel):

@@ -33,6 +33,7 @@ SAMPLE_ADS = [
         "bid_cpm": 12.50,
         "budget_remaining": 5000.00,
         "brand_safety_tags": ["sports", "fitness", "health"],
+        "product_image_url": "https://static.nike.com/a/images/t_web_pdp_535_v2/f_auto,u_9ddf04c7-2a9a-4d76-add1-d15af8f0263d,c_scale,fl_relative,w_1.0,h_1.0,fl_layer_apply/63c4596a-ca9a-4a56-82f3-0387903ed5f1/AIR+ZOOM+PEGASUS+41.png",
     },
     {
         "advertiser_id": "adv_sony",
@@ -45,6 +46,7 @@ SAMPLE_ADS = [
         "bid_cpm": 15.00,
         "budget_remaining": 8000.00,
         "brand_safety_tags": ["electronics", "audio", "technology"],
+        "product_image_url": "https://cdn.shopify.com/s/files/1/0397/7166/8635/products/WH1000XM5_Black.png?v=1761235815",
     },
     {
         "advertiser_id": "adv_dyson",
@@ -57,6 +59,7 @@ SAMPLE_ADS = [
         "bid_cpm": 18.00,
         "budget_remaining": 6000.00,
         "brand_safety_tags": ["home", "appliances", "technology"],
+        "product_image_url": "https://dyson-h.assetsadobe2.com/is/image/content/dam/dyson/products/vacuum-cleaners-category/dyson-v12-vacuum/shop-all-v15/V15%20-%20Shop%20all%20hero%20module_HEPA_LB-V15-US.jpg?$responsive$&cropPathE=desktop&fit=stretch,1&wid=3840",
     },
     {
         "advertiser_id": "adv_allbirds",
@@ -112,8 +115,9 @@ async def main():
             INSERT INTO ads (
                 advertiser_id, product_name, product_description,
                 target_topics, target_intents, creative_text, cta_url,
-                bid_cpm, budget_remaining, brand_safety_tags, embedding
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::vector)
+                bid_cpm, budget_remaining, brand_safety_tags, embedding,
+                product_image_url
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::vector,$12)
             """,
             ad["advertiser_id"],
             ad["product_name"],
@@ -126,6 +130,7 @@ async def main():
             ad["budget_remaining"],
             ad["brand_safety_tags"],
             embedding_str,
+            ad.get("product_image_url"),
         )
         print(f"  ✓ {ad['product_name']}")
 

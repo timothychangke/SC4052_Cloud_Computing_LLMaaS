@@ -58,7 +58,7 @@ function EditCampaignModal({ camp, onClose, onSuccess, onError }) {
 function CreateAdModal({ campaignId, onClose, onSuccess, onError }) {
   const [form, setForm] = useState({
     product_name: "", product_description: "", creative_text: "", cta_url: "",
-    bid_cpm: "", budget_remaining: "",
+    bid_cpm: "", budget_remaining: "", product_image_url: "",
     target_topics: [], target_intents: [], brand_safety_tags: [],
   });
   const [urlInput, setUrlInput] = useState("");
@@ -93,6 +93,7 @@ function CreateAdModal({ campaignId, onClose, onSuccess, onError }) {
         bid_cpm: parseFloat(form.bid_cpm) || 0, budget_remaining: parseFloat(form.budget_remaining) || 0,
         target_topics: form.target_topics, target_intents: form.target_intents,
         brand_safety_tags: form.brand_safety_tags,
+        product_image_url: form.product_image_url || null,
       }];
       await api.post(`/portal/campaigns/${campaignId}/ads`, body);
       onSuccess();
@@ -132,6 +133,7 @@ function CreateAdModal({ campaignId, onClose, onSuccess, onError }) {
       <FormField label="Product Description"><textarea style={{ ...inputStyle, minHeight: 60, resize: "vertical" }} value={form.product_description} onChange={e => set("product_description", e.target.value)} placeholder="Brief product description..." /></FormField>
       <FormField label="Creative Text"><textarea style={{ ...inputStyle, minHeight: 60, resize: "vertical" }} value={form.creative_text} onChange={e => set("creative_text", e.target.value)} placeholder="The ad copy the LLM will work with..." /></FormField>
       <FormField label="CTA URL"><input style={inputStyle} value={form.cta_url} onChange={e => set("cta_url", e.target.value)} placeholder="https://..." /></FormField>
+      <FormField label="Product Image URL (optional)"><input style={inputStyle} value={form.product_image_url} onChange={e => set("product_image_url", e.target.value)} placeholder="https://example.com/product-image.png" /></FormField>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
         <FormField label="Bid CPM ($)"><input style={inputStyle} type="number" value={form.bid_cpm} onChange={e => set("bid_cpm", e.target.value)} placeholder="12.50" /></FormField>
         <FormField label="Budget ($)"><input style={inputStyle} type="number" value={form.budget_remaining} onChange={e => set("budget_remaining", e.target.value)} placeholder="5000" /></FormField>

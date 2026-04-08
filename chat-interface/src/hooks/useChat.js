@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react'
 import { v4 as uuidv4 } from 'uuid'
-import { streamResponse, getThinkingPhrase } from '../utils/mockResponses'
+import { streamResponse, generateImage, getThinkingPhrase } from '../utils/mockResponses'
 
 /**
  * useChat — manages all chat state:
@@ -154,6 +154,57 @@ export function useChat() {
     cancelRef.current = false
   }, [activeId, appendMessage, autoTitle, updateMessage])
 
+  // ── Send an image-generation request ───────────────────────────────
+  const sendImageMessage = useCallback(async (prompt) => {
+    if (!prompt.trim()) return
+
+    let convId = activeId
+    if (!convId) {
+      convId = uuidv4()
+      const newConv = { id: convId, title: 'New Chat', createdAt: Date.now(), messages: [] }
+      setConversations(prev => [newConv, ...prev])
+      setActiveId(convId)
+    }
+
+    // User message — flagged so the UI can show the camera icon
+    const userMsg = {
+      id: uuidv4(),
+      role: 'user',
+      content: prompt,
+      isImagePrompt: true,
+      timestamp: Date.now(),
+    }
+    appendMessage(convId, userMsg)
+    autoTitle(convId, prompt)
+
+    // Assistant placeholder while we wait for the image
+    const assistantMsgId = uuidv4()
+    appendMessage(convId, {
+      id: assistantMsgId,
+      role: 'assistant',
+      content: '',
+      timestamp: Date.now(),
+      thinking: true,
+    })
+
+    cancelRef.current = false
+    setIsThinking(true)
+    setStreamingId(assistantMsgId)
+
+    const result = await generateImage(prompt, convId)
+
+    updateMessage(convId, assistantMsgId, {
+      thinking: false,
+      content: result.image_url ? '' : 'Sorry, image generation failed.',
+      imageUrl: result.image_url,
+      enhancedPrompt: result.enhanced_prompt,
+      adMetadata: result.ad_metadata,
+    })
+
+    setStreamingId(null)
+    setIsThinking(false)
+  }, [activeId, appendMessage, autoTitle, updateMessage])
+
   // ── Regenerate the last assistant response ───────────────────────
   const regenerateLastResponse = useCallback(async () => {
     if (!activeId || streamingId) return
@@ -234,6 +285,7 @@ export function useChat() {
     deleteConversation,
     renameConversation,
     sendMessage,
+    sendImageMessage,
     stopStreaming,
     regenerateLastResponse,
   }

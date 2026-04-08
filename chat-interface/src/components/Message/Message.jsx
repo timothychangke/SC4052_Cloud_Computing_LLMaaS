@@ -148,6 +148,35 @@ function StreamCursor() {
   return <span className="stream-cursor" aria-hidden="true" />
 }
 
+// ─── Generated image bubble ──────────────────────────────────────
+function ImageBubble({ imageUrl, enhancedPrompt, adMetadata }) {
+  const [loaded, setLoaded] = useState(false)
+  const [errored, setErrored] = useState(false)
+
+  return (
+    <div className="generated-image-wrap">
+      {!loaded && !errored && <div className="image-skeleton" />}
+      {errored ? (
+        <div className="image-error">Image could not be loaded.</div>
+      ) : (
+        <img
+          className={`generated-image ${loaded ? 'loaded' : ''}`}
+          src={imageUrl}
+          alt={enhancedPrompt || 'Generated image'}
+          onLoad={() => setLoaded(true)}
+          onError={() => setErrored(true)}
+        />
+      )}
+      {loaded && enhancedPrompt && (
+        <p className="image-prompt-caption">
+          {adMetadata && <span className="sponsored-badge">Sponsored</span>}
+          {enhancedPrompt}
+        </p>
+      )}
+    </div>
+  )
+}
+
 // ─── Message component ───────────────────────────────────────────
 export default function Message({ message, isStreaming, isThinking }) {
   const [feedback, setFeedback] = useState(null) // 'up' | 'down' | null
@@ -169,12 +198,22 @@ export default function Message({ message, isStreaming, isThinking }) {
         <div className="message-body">
           {isUser ? (
             <div className="user-bubble">
+              {message.isImagePrompt && (
+                <span className="image-prompt-icon" title="Image generation prompt">🖼</span>
+              )}
               <span>{message.content}</span>
             </div>
           ) : (
             <div className="assistant-body">
               {isThinking ? (
                 <ThinkingIndicator />
+              ) : message.imageUrl ? (
+                /* ── Generated image response ── */
+                <ImageBubble
+                  imageUrl={message.imageUrl}
+                  enhancedPrompt={message.enhancedPrompt}
+                  adMetadata={message.adMetadata}
+                />
               ) : (
                 <>
                   <div className="assistant-markdown">

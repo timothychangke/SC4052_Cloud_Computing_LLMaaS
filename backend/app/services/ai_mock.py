@@ -114,6 +114,24 @@ async def mock_extract_product_from_url(page_text: str) -> dict:
     }
 
 
+# ── Image Generation ───────────────────────────────────────
+
+async def mock_generate_image(prompt: str, ad: "Ad | None") -> dict:
+    """
+    Returns a placeholder image (picsum) with the product name woven into
+    the enhanced prompt — mirrors what the real module produces.
+    """
+    enhanced_prompt = prompt
+    if ad:
+        f"{prompt}, with {ad.product_name} naturally featured in the scene"
+    # Deterministic seed so the same prompt always returns the same placeholder
+    seed = abs(hash(prompt)) % 1000
+    return {
+        "image_url": f"https://picsum.photos/seed/{seed}/1024/576",
+        "enhanced_prompt": enhanced_prompt,
+    }
+
+
 # ── Engagement Detection ────────────────────────────────────
 
 async def mock_detect_engagement(

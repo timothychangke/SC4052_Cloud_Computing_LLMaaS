@@ -54,6 +54,7 @@ async def get_candidate_ads(
             brand_safety_tags,
             ad_context,
             ad_context_version,
+            product_image_url,
             1 - (embedding <=> $1::vector) AS similarity
         FROM ads
         WHERE active = true
@@ -102,6 +103,7 @@ async def get_candidate_ads(
                 similarity=float(r["similarity"]),
                 ad_context=r["ad_context"] or "",
                 ad_context_version=r["ad_context_version"] or 0,
+                product_image_url=r["product_image_url"],
             )
         )
 
@@ -113,9 +115,9 @@ async def get_candidate_ads(
     max_bid = max(c.bid_cpm for c in candidates) or 1.0
     for ad in candidates:
         ad.score = (
-            ad.similarity * 0.5
-            + (ad.bid_cpm / max_bid) * 0.3
-            + context.purchase_signal * 0.2
+            ad.similarity * 0.7
+            + (ad.bid_cpm / max_bid) * 0.15
+            + context.purchase_signal * 0.15
         )
 
     # -- Step 4: return top 3 --

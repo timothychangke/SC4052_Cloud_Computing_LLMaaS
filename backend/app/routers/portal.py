@@ -661,10 +661,10 @@ async def campaign_analytics(
         SELECT spend_date, impressions, clicks, engagements, spend
         FROM daily_spend_log
         WHERE campaign_id = $1::uuid
-          AND spend_date > CURRENT_DATE - $2
+          AND spend_date > CURRENT_DATE - ($2 || ' days')::interval
         ORDER BY spend_date DESC
         """,
-        campaign_id, days,
+        campaign_id, str(days),
     )
 
     return CampaignAnalyticsResponse(

@@ -323,6 +323,111 @@ Webpage content:
     return json.loads(raw)
 
 
+# ── Image Generation (DALL-E 3 + product-placement prompt) ─
+
+async def _build_product_placement_prompt(user_prompt: str, ad: Ad) -> str:
+    """
+    Uses Groq to rewrite the user's image prompt so that the advertised
+    product is organically placed in the scene.
+    """
+    prompt = f"""You are an expert image-prompt engineer for an advertising platform.
+A user wants to generate an image. Your job is to rewrite their prompt so the
+advertised product appears naturally in the scene — visible but not forced.
+
+User's original prompt: {user_prompt}
+
+Product to place: {ad.product_name}
+Product description: {ad.product_description}
+
+Rules:
+- Keep the core scene the user described.
+- Add the product in a way that fits the environment (e.g., on a shelf, in someone's hand, on a table, being worn by someone).
+- Keep the rewritten prompt under 200 words.
+- Return ONLY the rewritten image prompt, no explanation or preamble."""
+
+    resp = await _get_groq().chat.completions.create(
+        model=_CHAT_MODEL,
+        max_tokens=300,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return resp.choices[0].message.content.strip()
+
+
+async def real_generate_image(prompt: str, ad: Ad | None) -> dict:
+    """
+    Builds a product-placement prompt via Groq (when an ad is available),
+    then generates the image with gpt-image-1.
+
+    If the ad has a product_image_url, downloads it and passes it as a
+    reference image via images.edit so the model can visually ground the
+    product in the generated scene.  Falls back to images.generate when
+    no product image is present or the download fails.
+
+    gpt-image-1 returns base64 (no URL), so we convert it to a data URI.
+    Returns {"image_url": str, "enhanced_prompt": str}.
+    """
+    import io
+    import httpx
+    from openai import AsyncOpenAI
+
+    settings = get_settings()
+    client = AsyncOpenAI(api_key=settings.openai_api_key)
+
+    enhanced_prompt = prompt
+    if ad:
+        enhanced_prompt = await _build_product_placement_prompt(prompt, ad)
+
+    # --- attempt image-grounded generation when a product image exists ---
+    if ad and ad.product_image_url:
+        try:
+            async with httpx.AsyncClient(timeout=10) as http:
+                img_resp = await http.get(ad.product_image_url)
+                img_resp.raise_for_status()
+                img_bytes = img_resp.content
+
+            img_file = io.BytesIO(img_bytes)
+            img_file.name = "product.png"
+
+            response = await client.images.edit(
+                model="gpt-image-1",
+                image=img_file,
+                prompt=enhanced_prompt,
+                n=1,
+                quality='high',
+                size="1024x1024",
+            )
+            print("Use Product Image URL")
+        except Exception:
+            # fall back to plain generation if download or edit fails
+            response = await client.images.generate(
+                model="gpt-image-1",
+                prompt=enhanced_prompt,
+                n=1,
+                size="1024x1024",
+                quality="low",
+            )
+            print("Generate image from scratch")
+
+    else:
+        print("No product URL")
+        response = await client.images.generate(
+            model="gpt-image-1",
+            prompt=enhanced_prompt,
+            n=1,
+            size="1024x1024",
+            quality="low",
+        )
+        print("Generate image from scratch")
+
+    b64 = response.data[0].b64_json
+    image_url = f"data:image/png;base64,{b64}"
+
+    return {
+        "image_url": image_url,
+        "enhanced_prompt": enhanced_prompt,
+    }
+
+
 # ── Engagement Detection ────────────────────────────────────
 
 async def real_detect_engagement(

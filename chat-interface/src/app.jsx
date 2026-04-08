@@ -53,6 +53,7 @@ export default function App() {
               isStreaming={chat.isStreaming}
               sidebarOpen={sidebarOpen}
               onSendMessage={chat.sendMessage}
+              onSendImage={chat.sendImageMessage}
               onStopStreaming={chat.stopStreaming}
               onRegenerateResponse={chat.regenerateLastResponse}
               onToggleSidebar={toggleSidebar}
