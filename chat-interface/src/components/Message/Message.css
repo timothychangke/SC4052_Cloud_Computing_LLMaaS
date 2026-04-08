@@ -333,6 +333,64 @@
   font-weight: 600;
 }
 
+/* ─── Image prompt icon in user bubble ───────────────────────────── */
+.image-prompt-icon {
+  margin-right: 6px;
+  font-style: normal;
+  opacity: 0.8;
+}
+
+/* ─── Generated image ────────────────────────────────────────────── */
+.generated-image-wrap {
+  max-width: 640px;
+}
+
+.image-skeleton {
+  width: 100%;
+  max-width: 640px;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-md);
+  background: linear-gradient(90deg, var(--bg-surface2) 25%, rgba(255,255,255,0.05) 50%, var(--bg-surface2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.generated-image {
+  display: block;
+  width: 100%;
+  max-width: 640px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  opacity: 0;
+  transition: opacity 0.3s var(--ease);
+}
+
+.generated-image.loaded {
+  opacity: 1;
+}
+
+.image-error {
+  padding: 16px;
+  color: var(--text-dim);
+  font-size: 13px;
+  background: var(--bg-surface2);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+}
+
+.image-prompt-caption {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.5;
+  max-width: 640px;
+}
+
 .sponsored-badge {
   display: inline-block;
   background-color: #f3f4f6;

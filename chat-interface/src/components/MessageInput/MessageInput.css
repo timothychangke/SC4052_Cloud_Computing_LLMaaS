@@ -118,6 +118,82 @@
   transform: scale(1.05);
 }
 
+/* ─── Mode toggle pill ───────────────────────────────────────── */
+.mode-toggle-row {
+  max-width: 768px;
+  margin: 0 auto 8px;
+  display: flex;
+  align-items: center;
+}
+
+.mode-toggle-pill {
+  display: inline-flex;
+  background: var(--bg-surface2);
+  border: 1px solid var(--border-hover);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.mode-pill-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: transparent;
+  transition: background var(--duration), color var(--duration);
+  cursor: pointer;
+}
+
+.mode-pill-btn:hover:not(:disabled):not(.active) {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+.mode-pill-btn.active {
+  background: var(--accent);
+  color: #0d0d10;
+  cursor: default;
+}
+
+.mode-pill-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ─── Image-mode container highlight ─────────────────────────── */
+.input-container.image-mode {
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+.input-container.image-mode:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow), 0 2px 16px rgba(0, 0, 0, 0.3);
+}
+
+/* ─── Image send button variant ──────────────────────────────── */
+.send-btn.image-send {
+  background: var(--accent);
+  color: var(--text-inverted);
+}
+
+/* ─── Image mode label ───────────────────────────────────────── */
+.image-mode-label {
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--accent);
+  opacity: 0.75;
+  margin-top: 6px;
+  margin-bottom: 0;
+  max-width: 768px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
 /* ─── Disclaimer ─────────────────────────────────────────────── */
 .input-disclaimer {
   text-align: center;

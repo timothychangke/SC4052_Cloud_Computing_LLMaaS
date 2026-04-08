@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     # -- Groq secret key --
     groq_api_key: str = ""
 
+    # -- OpenAI key (for DALL-E image generation) --
+    openai_api_key: str = ""
+
     # -- CORS --
     cors_origins: str = "http://localhost:3000,http://localhost:5173"
 

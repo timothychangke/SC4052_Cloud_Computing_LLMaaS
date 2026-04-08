@@ -288,6 +288,27 @@ export async function streamResponse(prompt, sessionId, onChunk, isCancelled) {
 // }
 
 /**
+ * Request an AI-generated image with optional product placement.
+ * @param {string} prompt - The user's image description
+ * @param {string} sessionId - Active session ID
+ * @returns {Promise<{image_url: string|null, enhanced_prompt: string, ad_metadata: object|null}>}
+ */
+export async function generateImage(prompt, sessionId) {
+  try {
+    const response = await fetch(`${API_BASE}/generate-image`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt, session_id: sessionId }),
+    });
+    if (!response.ok) throw new Error(`Backend error: ${response.status}`);
+    return await response.json();
+  } catch (error) {
+    console.error("generateImage error:", error);
+    return { image_url: null, enhanced_prompt: prompt, ad_metadata: null };
+  }
+}
+
+/**
  * Get a random "thinking" label shown while the AI is preparing
  */
 export function getThinkingPhrase() {

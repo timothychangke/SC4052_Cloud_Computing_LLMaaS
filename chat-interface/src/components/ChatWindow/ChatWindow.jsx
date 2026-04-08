@@ -63,6 +63,7 @@ export default function ChatWindow({
   isStreaming,
   sidebarOpen,
   onSendMessage,
+  onSendImage,
   onStopStreaming,
   onRegenerateResponse,
   onToggleSidebar,
@@ -152,6 +153,7 @@ export default function ChatWindow({
       <MessageInput
         isStreaming={isStreaming}
         onSend={onSendMessage}
+        onSendImage={onSendImage}
         onStop={onStopStreaming}
       />
     </div>
