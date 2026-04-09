@@ -47,6 +47,8 @@ pip-log.txt
 *.synctex.gz
 *.toc
 *.loa
+*.acn
+*.bbl-SAVE-ERROR
 
 # Bibliography files
 *.bbl
