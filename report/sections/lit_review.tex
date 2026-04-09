@@ -1,7 +1,4 @@
-% ============================================================
-\section{Literature Review}
-\label{sec:literature-review}
-% ============================================================
+
 
 This section surveys the bodies of work that inform the design of the
 \textit{Ad LLM as a Service} platform. The review is organised by
@@ -302,8 +299,11 @@ addresses this risk through three mechanisms: (i)~the
 \texttt{[Sponsored]} tag is mandatory and enforced at the prompt
 level; (ii)~the response-generation prompt instructs the model to
 ignore the advertisement if it is not relevant to the user's question;
-and (iii)~conversations classified as sensitive are automatically
-excluded from ad injection.
+and (iii)~conversations classified as sensitive are automatically excluded 
+from ad injection; and (iv)~each ad carries brand-safety tags that allow 
+advertisers to declare topics their creative must not appear alongside, 
+providing a second, advertiser-controlled filter layered on top of the 
+platform's sensitivity gate.
 
 \paragraph{Regulatory frameworks.}
 The Federal Trade Commission (FTC) revised its Endorsement Guides in
@@ -394,6 +394,21 @@ naturalness of ad integration, disclosure accuracy, and ad relevance,
 enabling automated detection of quality regressions without requiring
 continuous human review.
 
+Beyond sampled offline monitoring, the Ad LLM platform extends the
+LLM-as-judge paradigm into an online measurement role: every follow-up
+turn after an ad impression is passed to a judge model that returns a
+structured multi-dimensional assessment comprising an engagement
+score, an ad-naturalness score, an estimated purchase-proximity score,
+a sentiment polarity, and a categorical engagement type (e.g.,
+\emph{product inquiry}, \emph{comparison}, \emph{price inquiry},
+\emph{purchase intent}, \emph{dismissal}). This contrasts with most
+prior LLM-as-judge deployments, which treat the judge as an offline
+evaluator of a held-out test set. Using the judge as an
+\emph{in-the-loop} instrument raises new considerations---judge
+consistency across runs, the cost of an additional LLM call per
+engaged turn, and the risk of judge drift as the underlying model is
+updated---that are under-explored in the current literature and which
+this project confronts directly.
 % ------------------------------------------------------------
 \subsection{User Engagement Metrics in Conversational Systems}
 \label{subsec:engagement-metrics}
@@ -414,30 +429,25 @@ response is a continuous text stream, the concept of a discrete
 link may not capture the full spectrum of user engagement with the
 recommended product.
 
-\paragraph{Novel conversational metrics.}
-The Ad LLM platform introduces two metrics that exploit the unique
-properties of the conversational medium:
-
-\begin{enumerate}[label=(\roman*), leftmargin=2.5em]
-  \item \emph{Follow-up engagement.} After an advertisement is
-    included in a response, the system monitors the user's next
-    message for references to the advertised product (e.g., ``Tell me
-    more about the Pegasus~41''). A follow-up that engages with the
-    product constitutes a stronger signal of genuine interest than a
-    passive impression or even a click, because it requires the user
-    to actively formulate a query about the product within the
-    conversational context.
-
-  \item \emph{Attention verification.} The time elapsed between
-    response delivery and the user's next action provides a proxy for
-    read-through. A response that is read carefully before the user
-    continues the conversation suggests higher attentional engagement
-    than one that is followed immediately by an unrelated query. This
-    metric, while noisy, enables the construction of ``verified
-    attention'' scores that weight impressions by estimated engagement
-    depth---a concept analogous to viewability measurement in display
-    advertising~\cite{ias2023viewability}.
-\end{enumerate}
+\paragraph{A multi-dimensional engagement vector.}
+In practice the Ad LLM platform decomposes ``engagement'' into a
+vector of six signals produced by a judge model on each post-ad
+follow-up turn: (a)~a binary engaged/not-engaged flag;
+(b)~an \emph{engagement type} drawn from a fixed taxonomy (product
+inquiry, comparison, price inquiry, purchase intent, feature question,
+positive reaction, negative reaction, dismissal); (c)~a continuous
+engagement score in $[0,1]$; (d)~an ad-naturalness score in $[0,1]$
+estimating how organic the placement felt from the user's reaction;
+(e)~a purchase-proximity score in $[0,1]$ approximating how close the
+user appears to a buying decision; and (f)~a sentiment polarity toward
+the ad. This decomposition is more informative than a single scalar
+engagement value because it separates \emph{whether} the user engaged
+from \emph{how} they engaged and \emph{how the ad was received},
+enabling the downstream optimisation described in
+Section~\ref{subsec:adaptive-context} below. It also aligns with the
+direction advocated by Mehri and Esk{\'e}nazi~\cite{mehri2020unsupervised},
+who argue that dialogue quality is inherently multi-faceted and
+resists collapse to a single number.
 
 \paragraph{Why conversational engagement is a stronger signal.}
 The fundamental advantage of conversational engagement metrics over
@@ -462,18 +472,160 @@ that longer user responses and sustained topic continuity correlate
 with self-reported satisfaction in open-domain dialogue. Mehri and
 Esk{\'e}nazi~\cite{mehri2020unsupervised} proposed unsupervised
 dialogue quality metrics based on response coherence and relevance
-scoring. The engagement classifier in the Ad LLM platform draws on
-this work by treating topic persistence (continued discussion of the
-advertised product) as the primary engagement signal, initially
-implemented via keyword and entity matching with a planned upgrade to
-a lightweight LLM-based classifier as labelled data becomes available.
+scoring. The engagement classifier in the Ad LLM platform draws on 
+this work by treating topic persistence (continued discussion of 
+the advertised product) as one component of engagement, but goes 
+beyond lexical proxies by delegating the full classification to an 
+LLM judge that returns the structured six-signal vector described above. 
+This replaces an earlier keyword-and-entity-matching prototype, and is 
+made tractable by the same LLM-as-judge infrastructure used for offline 
+quality monitoring.
+
+% ------------------------------------------------------------
+\subsection{Adaptive Prompt and Context Optimisation}
+\label{subsec:adaptive-context}
+% ------------------------------------------------------------
+
+\paragraph{From static prompts to data-driven prompt refinement.}
+The prompt-engineering literature surveyed in
+Section~\ref{subsec:prompt-engineering} treats the system prompt as a
+human-authored artefact that is iterated manually against an
+evaluation set. A growing body of work has begun to automate this
+loop. Automatic Prompt Engineer (APE)~\cite{zhou2023ape} frames prompt
+design as a black-box search problem in which candidate instructions
+are generated by an LLM, scored against a task metric, and resampled.
+PromptBreeder~\cite{fernando2023promptbreeder} extends this to a
+self-referential evolutionary process in which both the task prompts
+and the mutation operators are improved jointly. These approaches
+demonstrate that prompts are not fixed assets but can be optimised
+against a measurable reward signal---essentially applying the
+reinforcement-learning-from-feedback idea at the prompt level rather
+than the weight level.
+
+\paragraph{Per-item context as an optimisable unit.}
+The Ad LLM platform applies this principle at the granularity of
+individual ads. Each ad in the inventory carries, in addition to its
+creative text and targeting metadata, a free-text ``presentation
+context guide'' that is injected into the response-synthesis prompt
+whenever that ad is matched. This guide specifies how the product
+should be framed: tone, recommended angles, features to emphasise,
+situations in which to avoid mentioning it, and comparisons to avoid.
+It is distinct from the creative text in that it constrains the
+\emph{model's rendering} of the product rather than the copy shown to
+the user. The context guide is versioned: each update is persisted
+alongside the engagement metrics snapshot that justified it, yielding
+an auditable history of how the framing of each ad has evolved.
+The initial version of each context guide is itself generated 
+automatically when the ad is first created: a bootstrap LLM call 
+inspects the ad's creative text, targeting metadata, and (where available) 
+scraped product-page content, and drafts a first-pass guide, so that the 
+optimisation loop begins from a reasonable starting point rather than from 
+an empty string.
+
+\paragraph{Closing the loop with engagement feedback.}
+The multi-dimensional engagement vector introduced above serves as the
+reward signal for an automatic optimiser. At a configurable cadence,
+and subject to minimum-sample and cooldown guards, a separate LLM call
+reviews the recent engagement history for an ad---aggregate
+engagement rate, average engagement score, average naturalness score,
+average purchase proximity, positive and negative sentiment counts,
+dismissal counts, and a sample of raw follow-up messages---together
+with the current context guide, and proposes a revised guide with an
+accompanying natural-language rationale. The optimiser prompt encodes
+diagnostic heuristics such as ``if naturalness is low, soften the
+tone'' and ``if dismissals are high, tighten the relevance criteria.''
+The resulting system implements a closed loop analogous in spirit to
+bandit-style ad optimisation~\cite{li2010contextual}, but operating
+over natural-language prompt fragments rather than numeric bid or
+placement parameters, and using an LLM both to interpret the feedback
+and to author the next candidate. To the best of our knowledge, no
+prior published work applies per-item LLM-driven prompt optimisation
+to a conversational advertising setting.
+
+\paragraph{Relationship to reinforcement learning from human feedback.}
+RLHF~\cite{ouyang2022instructgpt} trains model weights against a
+reward model learned from human preference data. The adaptive context
+mechanism adopts the same underlying intuition---behaviour should be
+shaped by downstream feedback---but differs in two important ways.
+First, the feedback signal is produced by an LLM judge rather than
+human raters, following the LLM-as-judge paradigm discussed above.
+Second, no gradient updates are applied to the base model; adaptation
+happens entirely in the text of the prompt context, which is cheap,
+reversible, and interpretable. This positions the approach closer to
+\emph{prompt-level learning} than to parameter-level fine-tuning, and
+makes it attractive for deployment scenarios in which the base model
+is a third-party API whose weights are inaccessible.
+
+% ------------------------------------------------------------
+\subsection{Generative Image Models and Native Product Placement}
+\label{subsec:image-placement}
+% ------------------------------------------------------------
+
+\paragraph{Text-to-image and image-editing models.}
+Recent text-to-image systems---DALL-E~3~\cite{betker2023dalle3}, Stable
+Diffusion~\cite{rombach2022ldm}, and Imagen~\cite{saharia2022imagen}---produce
+photorealistic images from natural-language prompts and have become
+standard components of generative chat interfaces. A parallel line of
+work on image editing and subject-driven generation, including
+DreamBooth~\cite{ruiz2023dreambooth} and InstructPix2Pix~\cite{brooks2023instructpix2pix},
+enables a specific visual subject to be inserted or preserved across
+generations by conditioning on one or more reference images in
+addition to the text prompt. These capabilities are now exposed as
+image-editing endpoints in commercial APIs, allowing a reference image
+to act as a visual anchor for the generated scene.
+
+\paragraph{Product placement as a creative convention.}
+In traditional media---film, television, and more recently influencer
+video---product placement is a long-established advertising format in
+which a branded item is integrated diegetically into the scene rather
+than presented as an interruption~\cite{balasubramanian2006productplacement}.
+Empirical studies have shown that well-executed placement can achieve
+higher recall and more favourable brand attitudes than conventional
+spot advertising, provided the placement feels natural to the
+narrative context~\cite{vanreijmersdal2009placement}. Until recently,
+this format required human creative direction and physical staging;
+generative image models now make algorithmic placement technically
+feasible at per-request granularity.
+
+\paragraph{Extending the Ad LLM thesis to the visual modality.}
+When a user issues an image-generation request through the Ad LLM
+platform, the same context-extraction and RAG-based ad-matching
+pipeline that handles chat messages is invoked to select a relevant
+product. An auxiliary LLM call then rewrites the user's original image
+prompt so that the matched product appears organically in the scene
+(e.g., ``on a shelf'', ``held by a subject'', ``worn by a runner''),
+preserving the user's original creative intent while adding the
+product as a diegetic element. If the ad inventory includes a
+reference photograph of the product, the rewritten prompt is passed to
+an image-editing endpoint together with the reference image, so that
+the generated scene is visually grounded in the actual product rather
+than in the model's prior over product names. This directly mirrors
+the text pipeline's ``instruct the generative model to weave in the
+ad'' design philosophy and extends it to pixels, producing what is, to
+our knowledge, the first described pipeline for \emph{RAG-matched,
+sponsored product placement in user-requested AI-generated imagery}.
+
+\paragraph{Open questions specific to the visual modality.}
+Placing real branded products in generated images raises ethical and
+legal questions that do not arise in the text case. Visual disclosure
+is harder than textual disclosure: a \texttt{[Sponsored]} tag can be
+prepended to a response caption, but the image itself carries no
+intrinsic marker that the product within it is a paid placement.
+Intellectual-property considerations are also sharper, since a
+generated image of a branded product may implicate trademark and
+trade-dress rights that a textual mention does not. These issues are
+acknowledged as open and are discussed further in the ethical
+considerations of Section~\ref{subsec:problem-ethics}; the literature
+on regulatory responses to AI-generated visual content is still
+nascent and, at the time of writing, does not yet provide clear
+guidance on sponsored generative imagery.
 
 % ------------------------------------------------------------
 \subsection{Summary and Research Gap}
 \label{subsec:lit-summary}
 % ------------------------------------------------------------
 
-The preceding subsections have surveyed five bodies of work that
+The preceding subsections have surveyed eight bodies of work that
 converge on the problem addressed by this project: (i)~the evolution
 of digital advertising toward native, content-integrated formats;
 (ii)~the capabilities of transformer-based LLMs for instruction
@@ -482,9 +634,15 @@ RAG paradigm for grounding language-model output in retrieved external
 context; (iv)~the emerging practice of embedding advertising in
 conversational AI interfaces, together with the ethical and regulatory
 constraints that govern disclosure; (v)~prompt engineering techniques
-for controlled generation and the LLM-as-judge paradigm for automated
-quality evaluation; and (vi)~engagement metrics that go beyond
-click-through to capture genuine user attention in dialogue systems.
+for controlled generation and the LLM-as-judge paradigm for both
+offline and in-the-loop quality evaluation; (vi)~engagement metrics
+that go beyond click-through to capture genuine user attention in
+dialogue systems, decomposed into a multi-dimensional signal vector;
+(vii)~automatic and data-driven prompt optimisation as a lightweight
+alternative to parameter-level fine-tuning; and (viii)~generative
+image models and the long-standing advertising convention of product
+placement, which together make algorithmic visual ad integration
+newly feasible.
 
 The gap that this project addresses lies at the intersection of these
 strands. Existing industry deployments of conversational

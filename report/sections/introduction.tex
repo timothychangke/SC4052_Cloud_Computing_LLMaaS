@@ -1,0 +1,263 @@
+\subsection{Background and Motivation}
+\label{subsec:background}
+
+The dominant paradigm in digital advertising has, for two decades, relied on a
+fundamental assumption: the user interacts with a visual interface---a web page,
+a search results listing, a social media feed---where rectangular display regions
+can be allocated to sponsored content. Banner advertisements, programmatic
+display auctions, and search-engine sponsored links all exploit this property.
+The advertiser purchases screen real estate; the publisher renders a creative
+unit; the user either attends to it or does not. This model, refined through
+successive generations of behavioural targeting and real-time bidding, generates
+hundreds of billions of dollars in annual revenue worldwide and underpins the
+economic viability of most free-to-use internet services.
+
+Conversational AI interfaces disrupt this assumption at its foundation. Systems
+such as ChatGPT, Claude, and Gemini present information as a single stream of
+natural-language text. There are no sidebars, no interstitial slots, and no
+visual regions in which a banner can be placed without breaking the
+conversational contract between the system and its user. At the same time, these
+interfaces are absorbing an increasing share of the queries that users
+previously directed to search engines---product research, comparison shopping,
+recommendation requests---precisely the query types that carry the highest
+commercial intent and, consequently, the highest advertising value. The shift is
+not merely a change of medium; it is a structural transformation in how users
+express intent, receive information, and make purchasing decisions.
+
+The advertising industry therefore faces a concrete technical problem: how to
+monetise conversational AI interactions without degrading the user experience
+that makes them valuable in the first place. Appending a block of sponsored
+links to the end of a chat response replicates the search-ad format but
+sacrifices the natural feel of the conversation. Inserting interstitial
+advertisements between turns interrupts the dialogue flow and erodes user trust.
+Neither approach exploits the distinctive capability of a large language model
+(LLM), namely its ability to generate contextually appropriate, fluent
+natural-language text that integrates information from multiple sources---including
+sponsored product information---into a single coherent response.
+
+This observation motivates the present work. If the LLM can understand the
+user's intent, match it against an inventory of relevant products, and weave a
+sponsored recommendation naturally into an otherwise helpful response, then the
+advertisement ceases to be an interruption and becomes, instead, part of the
+answer. The result is an advertising format that is native to the conversational
+medium: contextually relevant, linguistically integrated, and measurable not
+merely through impressions and clicks but through the user's subsequent
+conversational engagement with the recommended product.
+
+The same logic extends beyond text. Conversational AI interfaces increasingly
+support image generation as a native modality, and a user who asks the system
+to render a scene is expressing creative and often commercial intent in a form
+that is no less monetisable than a textual product query. If the language model
+can weave a sponsored product into a written answer, an image model can, by
+analogous reasoning, place that product naturally within a generated scene---on
+a shelf, in a character's hand, within the environment the user described---rather
+than overlaying a banner on top of the artwork. Treating text and image
+generation as two surfaces of a single advertising pipeline is therefore a
+natural extension of the core thesis, and one that this project pursues
+explicitly.
+
+A workable platform, however, cannot consist of the generative pipeline alone.
+A production-grade advertising system also requires the operational scaffolding
+that makes it usable by real advertisers: a way to onboard them, a way to
+organise their spend into campaigns with start and end dates and daily
+pacing, a way to create and manage ads without touching the database directly,
+and a way for both the platform operator and the advertiser to observe how
+their money is being spent. These concerns are conventionally relegated to
+``future work,'' but they fundamentally shape the data model and the request
+path---budget gating, for example, must happen inside the ad-retrieval loop,
+not as an afterthought---and this project therefore treats them as first-class
+deliverables rather than deferred extensions.
+
+\subsection{Project Objectives}
+\label{subsec:objectives}
+
+This project designs, implements, and evaluates an end-to-end LLM-powered
+conversational advertising platform---referred to throughout this report as
+\textit{Ad LLM as a Service}---that delivers inline sponsored product
+recommendations within AI chat responses. The platform satisfies the following
+objectives:
+
+\begin{enumerate}[label=(\roman*), leftmargin=2.5em]
+  \item \textbf{Intent-aware context extraction.} A lightweight LLM call
+    extracts structured context from each user message and the preceding
+    conversation history, producing a classification of intent, topical
+    relevance, sentiment, purchase signal strength, and---critically---a
+    sensitivity-aware ad receptivity score that gates whether any advertisement
+    should be shown at all.
+
+  \item \textbf{Semantic ad matching with budget-aware eligibility.} The
+    extracted context is embedded into a vector representation and matched
+    against a pre-embedded ad inventory via cosine similarity search over
+    \texttt{pgvector}. Candidate ads are then filtered through a campaign
+    eligibility check---verifying that the parent campaign is active, within
+    its scheduled window, and has not exhausted either its total budget or
+    its daily cap---and re-ranked by a business-rule stage that incorporates
+    bid price, per-session frequency caps, and brand-safety tags.
+
+  \item \textbf{Natural ad integration with mandatory disclosure.} The main
+    response-generation LLM receives the matched advertisement as part of its
+    prompt context and is instructed to weave the product mention into a helpful
+    answer if and only if the product is genuinely relevant. Every sponsored
+    mention carries a \texttt{[Sponsored]} disclosure tag, ensuring compliance
+    with Federal Trade Commission (FTC) endorsement guidelines.
+
+  \item \textbf{Multi-dimensional response and engagement evaluation.} Beyond
+    conventional impression and click-through tracking, a dedicated LLM-as-judge
+    module analyses each post-ad follow-up message and returns a structured set
+    of metrics: an engagement type classification (product inquiry, comparison,
+    price inquiry, purchase intent, feature question, positive or negative
+    reaction, dismissal), a continuous engagement score, sentiment toward the
+    advertisement, a naturalness score capturing how intrusive the placement
+    felt, and an estimated purchase-proximity score. These metrics jointly
+    form a higher-fidelity signal than any single click-or-not-click
+    measurement and are the substrate on which downstream optimisation
+    operates.
+
+  \item \textbf{Ethical safeguards.} Conversations classified as sensitive---those
+    involving health crises, emotional distress, financial hardship, or
+    grief---are automatically excluded from ad injection, regardless of
+    commercial relevance.
+
+  \item \textbf{Adaptive per-ad context optimisation.} Each advertisement in
+    the inventory carries a dynamic presentation-guidance document---its
+    \emph{ad context}---which is injected into the response-synthesis prompt
+    alongside the product description. An initial version of this context is
+    generated automatically by an LLM at the moment the ad is created, so that
+    every ad begins life with a coherent presentation strategy rather than an
+    empty field. A background optimiser then periodically reviews the
+    accumulated engagement metrics for each ad, diagnoses what is working and
+    what is not (low naturalness, high dismissal rate, weak purchase proximity
+    despite strong topical match), and asks a reasoning LLM to rewrite the
+    context guide accordingly. Every revision is versioned and persisted to an
+    \texttt{ad\_context\_history} table together with the metrics snapshot that
+    triggered it and a natural-language justification, yielding a fully
+    auditable record of how each ad's presentation strategy evolved over time.
+
+  \item \textbf{Image generation with organic product placement.} The platform
+    exposes a second generative surface alongside text chat: a user-prompted
+    image-generation endpoint that routes through the same context extraction
+    and ad matching pipeline. When a relevant sponsored product is identified,
+    the user's original image prompt is rewritten by an auxiliary LLM into a
+    placement prompt that fits the product into the requested scene, and the
+    final image is rendered by a diffusion model (\texttt{gpt-image-1}). When
+    the advertised product has a reference photograph, it is supplied to the
+    image model via an edit-mode call so that the rendered product is visually
+    grounded in the real article rather than hallucinated from its textual
+    description.
+
+  \item \textbf{Advertiser portal with campaign and budget management.} A
+    self-serve REST API and accompanying React interface allow advertisers
+    to register, organise their spend into campaigns with optional start
+    dates, end dates, and daily budget caps, and create ads within each
+    campaign. Campaigns follow an explicit lifecycle---\texttt{draft},
+    \texttt{active}, \texttt{paused}, \texttt{completed}---with
+    auto-completion when the total budget is exhausted, and daily spend is
+    reset lazily at first touch each new day rather than via a cron job.
+    Ad creation is accelerated by a URL-based extraction flow in which the
+    advertiser pastes a product page URL, the server scrapes it, and an LLM
+    call populates the ad fields (name, description, creative copy, target
+    topics and intents, brand-safety tags) as a pre-filled draft that the
+    advertiser can review and edit before submission.
+
+  \item \textbf{Dual analytics dashboards.} The platform ships two distinct
+    analytics surfaces backed by a shared event log. A global, platform-wide
+    dashboard reports aggregate impressions, click-through rate, engagement
+    events, estimated revenue, and top-performing ads across all advertisers,
+    intended for the platform operator. An advertiser-facing dashboard
+    reports the same metrics scoped to a single advertiser or a single
+    campaign, with a daily breakdown driven by the \texttt{daily\_spend\_log}
+    table and visual indicators of budget utilisation.
+
+  \item \textbf{Functional MVP.} The deliverable is a working prototype that
+    demonstrates the complete pipeline from user message to ad-augmented
+    response---across both text and image modalities---together with the
+    advertiser portal, the adaptive context optimiser, and both analytics
+    dashboards.
+\end{enumerate}
+
+\subsection{Scope and Constraints}
+\label{subsec:scope}
+
+The platform is scoped as a minimum viable product (MVP) and is subject to
+several deliberate constraints that bound the design space.
+
+The architecture is a single-service deployment: one FastAPI orchestrator
+coordinates all internal modules, a single Redis instance manages session state,
+and a single PostgreSQL database (extended with \texttt{pgvector}) stores the
+ad inventory, the advertiser and campaign records, the daily spend log, the
+ad-context history, and the event log. This monolithic design is appropriate
+for the current scale---tens of thousands of ads, moderate request
+concurrency---and avoids the operational complexity of a distributed
+microservice architecture.
+
+Two external dependencies impose hard constraints on latency and cost. Every
+chat request requires at minimum two LLM API calls---one lightweight call for
+context extraction and one full-model call for response synthesis---plus one
+embedding API call for the query vector. The total end-to-end latency budget
+is three seconds, inclusive of all network round-trips and internal
+processing. The per-request cost is dominated by these API calls, and the
+re-ranking stage uses heuristic scoring weights (a weighted combination of
+semantic similarity, normalised bid price, and purchase signal) rather than a
+learned model, since no click-through data is available at launch. Image
+generation is treated as a separate interactive surface with its own, looser
+latency budget, since diffusion-model calls routinely exceed ten seconds and
+are dominated by GPU inference time rather than by the orchestration overhead
+that constrains the text path.
+
+The engagement evaluator is implemented as a single LLM call that returns the
+structured metrics described in Section~\ref{subsec:objectives}. It runs
+asynchronously, off the critical request path, so its latency does not count
+against the three-second response budget; the trade-off is that engagement
+metrics become available only after a short delay rather than synchronously
+with the turn in which the ad was shown.
+
+The adaptive context optimiser is similarly a deferred, out-of-band process.
+Optimisation for a given advertisement is gated by two guards---a minimum of
+five recorded engagements and a minimum interval of twenty-four hours since
+the previous revision---which together prevent the system from overfitting to
+noise and from thrashing the ad context under light traffic. An advertisement
+with insufficient traffic therefore retains its LLM-generated initial context
+indefinitely, and optimisation only begins once the statistical foundation is
+adequate.
+
+The advertiser portal is scoped to the operational primitives needed to run a
+campaign end-to-end: advertiser registration, campaign CRUD with budget and
+schedule controls, ad CRUD with URL-based pre-filling, and scoped analytics.
+Authentication middleware, invoicing, payment processing, and advertiser
+self-service account recovery are deliberately out of scope for the MVP; the
+portal assumes a trusted operator environment and defers commercial-grade
+identity and billing to subsequent iterations.
+
+\subsection{Report Organisation}
+\label{subsec:report-org}
+
+The remainder of this report is organised as follows.
+Section~\ref{sec:literature-review} surveys the relevant literature across four
+areas: the evolution of digital advertising formats, the capabilities of large
+language models for controlled generation, retrieval-augmented generation as a
+paradigm for context-aware information retrieval, and the emerging body of work
+on advertising within conversational interfaces. Section~\ref{sec:problem-statement}
+formulates the problem precisely, identifying the technical challenges of
+real-time intent extraction, low-latency semantic ad matching, natural ad
+integration, engagement measurement, and per-campaign budget enforcement,
+together with the ethical and regulatory constraints that any solution must
+satisfy.
+Section~\ref{sec:solution-design} presents the system architecture and the
+design of each component: the FastAPI orchestrator, the context extraction
+module, the Redis-backed session manager, the \texttt{pgvector}-based ad
+matching pipeline with budget-gated eligibility, the prompt-engineered
+response synthesis module, the image-generation endpoint with
+product-placement prompt rewriting, the LLM-as-judge engagement evaluator,
+the adaptive ad-context optimiser, the advertiser portal with its
+URL-based ad extraction flow, and the dual analytics subsystem serving both
+the platform-wide and advertiser-scoped dashboards. Section~\ref{sec:implementation}
+describes the implementation in detail, including workstream responsibilities,
+the database schema, API contracts, and the quality assurance framework.
+Section~\ref{sec:illustrative-examples} walks through end-to-end examples
+that exercise representative paths through the pipeline, including successful
+ad injection, sensitive-conversation suppression, irrelevant-ad rejection,
+engagement follow-up detection, multi-turn context accumulation, an
+image-generation request with organic product placement, a campaign reaching
+its daily budget cap, and an advertiser creating a new ad via URL extraction.
+Section~\ref{sec:conclusions} summarises the contributions, discusses
+limitations, and outlines directions for future work.
