@@ -1,0 +1,228 @@
+
+
+% ------------------------------------------------------------
+\subsection{Request-Path Components}
+\label{subsec:request-path}
+% ------------------------------------------------------------
+
+This subsection describes the synchronous, user-facing pipeline: the
+sequence of components that a single user message---or a single image
+request---traverses between arrival at the orchestrator and the
+return of the rendered response. Asynchronous concerns such as event
+logging, analytics rollups, and the advertiser portal are deferred to
+Section~\ref{subsec:offline-path}. The components below are presented
+in the order in which they execute on the request path, and each is
+characterised by its inputs, its outputs, and the failure mode it
+adopts when a downstream dependency is unavailable.
+
+% ------------------------------------------------------------
+\subsubsection{Orchestrator API (FastAPI)}
+\label{subsubsec:orchestrator}
+% ------------------------------------------------------------
+
+The orchestrator is a single FastAPI service that exposes the public
+HTTP surface of the platform and coordinates every internal module
+involved in producing a response. It is deliberately monolithic:
+context extraction, ad retrieval, response synthesis, session
+management, and event logging are mounted as in-process modules behind
+a thin router layer rather than as independent services. This choice
+trades the horizontal scalability of a microservice topology for two
+properties that matter more at the MVP scale, namely a single
+deployment artefact and the elimination of inter-service network hops
+from the critical latency path.
+
+The principal endpoint is \texttt{POST /chat}, whose handler implements
+a seven-stage pipeline. The handler first loads the conversation state
+for the supplied \texttt{session\_id} from Redis and, if the previous
+turn surfaced an advertisement, dispatches an engagement-detection
+call against the user's new message before any other work proceeds.
+The user's turn is then persisted, and the message together with the
+rolling history is passed to the context extraction module. If the
+extracted \texttt{ad\_receptivity} field is anything other than
+\texttt{none}, the handler issues an embedding call on the extracted
+context, retrieves a re-ranked candidate set from the ad service,
+generates per-impression tracking URLs, and invokes response synthesis
+with the chosen ad bound into the prompt. If receptivity is
+\texttt{none}---the safety branch---the same synthesis call is made
+with an empty ad list, so that sensitive conversations follow an
+identical code path but never carry sponsored content. The handler
+finally appends the assistant turn to Redis, logs an impression event
+if an ad was injected, and returns a response payload containing the
+rendered text and, when applicable, the ad metadata required by the
+frontend to render the \texttt{[Sponsored]} badge.
+
+Two design decisions deserve emphasis. First, every call into the AI
+modules is wrapped in a guarded \texttt{try/except} block whose
+fallback is to continue the pipeline without the failed signal: a
+context-extraction failure degrades the request to an unsponsored
+response rather than to an error, and a response-synthesis failure is
+the only condition under which the endpoint returns a non-2xx status.
+The orchestrator therefore treats advertising as a strictly additive
+overlay on a working chat service, never as a precondition for it.
+Second, the secondary endpoints---\texttt{GET /track/click} for click
+attribution, \texttt{GET /analytics/summary} for the dashboard, and
+the \texttt{/portal/*} family for advertiser self-service---are mounted
+on the same application but execute outside the latency-critical chat
+path and are therefore free to perform synchronous database work that
+the chat handler would have to defer.
+
+% ------------------------------------------------------------
+\subsubsection{Context Extraction Module}
+\label{subsubsec:context-extraction}
+% ------------------------------------------------------------
+
+The context extraction module is the first AI call on the request
+path and the component on which every subsequent ad-related decision
+depends. It receives the user's current message together with the
+rolling conversation history and returns a structured object whose
+fields are the intent label, a list of topics, a list of named
+entities, a coarse sentiment value, a continuous purchase signal in
+the closed unit interval, and a four-valued ad-receptivity label
+drawn from \(\{\texttt{high}, \texttt{medium}, \texttt{low}, \texttt{none}\}\).
+This object is the sole interface between raw conversational text and
+the retrieval and synthesis stages that follow; no downstream module
+re-reads the user message for ad-related decisions.
+
+The module is implemented as a single call to a lightweight chat
+model, chosen so that the extraction step contributes only marginally
+to the end-to-end latency budget while still benefiting from the
+in-context reasoning that distinguishes, for example, a product
+research query from a venting message that happens to mention a brand.
+The prompt instructs the model to return strict JSON conforming to the
+schema above, and the orchestrator validates the response against a
+Pydantic model before propagating it; a parse failure is treated as a
+soft error and degrades the request to the unsponsored branch.
+
+The \texttt{ad\_receptivity} field carries a load that the other
+fields do not. It is the platform's safety gate: when the extractor
+labels a message as describing a health crisis, an episode of
+emotional distress, or a financial hardship, the field is set to
+\texttt{none} and the orchestrator unconditionally skips ad
+retrieval and ad injection for that turn. This places the safety
+decision at the earliest possible point in the pipeline, before any
+embedding or retrieval work has been performed, and ensures that
+sensitive conversations cannot incur an impression even
+accidentally. The remaining three values are interpreted as a soft
+gate by the re-ranker rather than as hard switches, so that a
+borderline-receptive turn can still produce a recommendation when the
+semantic match to inventory is sufficiently strong.
+
+% ------------------------------------------------------------
+\subsubsection{Session Management (Redis)}
+\label{subsubsec:session-management}
+% ------------------------------------------------------------
+
+Session state is held in a single Redis instance and keyed by the
+\texttt{session\_id} that the frontend generates at the start of each
+conversation. Each session record contains a rolling window of the
+ten most recent turns, an accumulated list of topics observed across
+the conversation, the history of purchase signals reported by the
+context extractor, the identifiers of advertisements already shown in
+the session, and a turn counter. The rolling window bounds both the
+memory footprint per session and the number of tokens that the
+context extractor and the response synthesiser must process on each
+turn, which is the dominant cost driver in both calls.
+
+Three properties of this design are worth noting. First, the history
+of purchase signals enables the re-ranker to detect monotone
+escalation across turns, which is a stronger purchase indicator than
+any single message in isolation; the platform exploits this without
+requiring the LLMs themselves to reason over multi-turn dynamics.
+Second, the set of advertisements already shown is consulted by the
+re-ranker to suppress immediate repetition, which would otherwise be
+the dominant failure mode of a purely similarity-driven retriever in
+a long conversation about a single topic. Third, because Redis is the
+only stateful dependency on the chat path that the orchestrator
+writes to synchronously, the platform can tolerate a Redis outage by
+falling back to a stateless mode in which every turn is treated as
+the first turn of a fresh conversation; the user observes a loss of
+personalisation but not a loss of service.
+
+% ------------------------------------------------------------
+\subsubsection{Response Synthesis with Ad Injection}
+\label{subsubsec:response-synthesis}
+% ------------------------------------------------------------
+
+Response synthesis is the second and more expensive of the two LLM
+calls on the request path. It receives the user's message, the
+rolling conversation history, the structured context object produced
+by the extractor, the chosen advertisement (if any), and the
+pre-generated tracking URL associated with that impression. Its
+output is a single markdown-formatted assistant message which the
+frontend renders directly into the chat transcript.
+
+The defining design decision is that ad injection is realised as
+\emph{prompt-level conditioning} rather than as post-hoc text
+rewriting. When an advertisement is selected, the synthesiser's
+system prompt is augmented with a sponsored block that contains the
+product name, its description, the advertiser-supplied creative copy,
+any campaign-level presentation guidance, and a strict instruction to
+weave the product into the response as a markdown link of the form
+\texttt{[Sponsored] [\textit{product}](\textit{tracking\_url})},
+followed by a single compelling reason. The synthesis model is then
+free to determine where in its response the sponsored mention is
+introduced, which substantive parts of the user's question to address
+first, and how to phrase the recommendation so that it follows
+naturally from the surrounding answer. This delegation is what
+distinguishes the platform from a banner-style overlay: the model is
+not asked to attach an advertisement to a response, it is asked to
+write a response in which the advertisement participates.
+
+When the receptivity gate has fired and no advertisement is supplied,
+the same synthesis call is made with an unmodified system prompt. The
+two branches share a single code path and a single model invocation,
+which guarantees that the unsponsored response distribution is not
+distorted by structural differences between the two branches and that
+a regression in the sponsored branch cannot silently corrupt the
+unsponsored one. The \texttt{[Sponsored]} marker and the tracking URL
+are the only artefacts by which a downstream observer---the user, the
+analytics dashboard, or a future audit---can distinguish a sponsored
+response from an organic one.
+
+% ------------------------------------------------------------
+\subsubsection{Image Generation with Product Placement}
+\label{subsubsec:image-generation}
+% ------------------------------------------------------------
+
+The image generation endpoint is the platform's second generative
+surface and the visual analogue of the chat pipeline described above.
+It is exposed as a distinct route on the same orchestrator and
+operates under a deliberately looser latency budget, since
+diffusion-model inference routinely exceeds ten seconds and is
+dominated by GPU time rather than by the orchestration overhead that
+constrains the text path. Its purpose is to demonstrate that the
+context-extraction and retrieval-augmented matching pipeline
+generalises beyond text and can deliver organic, RAG-matched product
+placement directly into user-requested imagery.
+
+When a user submits an image prompt, the orchestrator routes the
+prompt through the same context extractor used on the chat path,
+issues an embedding call against the resulting context object, and
+retrieves a re-ranked candidate set from the ad service. If a
+sponsored product is selected, the original prompt is not passed to
+the image model directly. Instead, an auxiliary lightweight LLM call
+rewrites the prompt into a \emph{placement prompt}: a new
+specification that preserves the user's stated subject, style, and
+composition while introducing the matched product as a diegetic
+element of the scene---worn by a subject, held by a hand, resting on
+a surface, displayed on a shelf---chosen to fit the semantics of the
+original request rather than to dominate it. The rewritten prompt is
+then passed to the image model, \texttt{gpt-image-1}, which renders
+the final image.
+
+A second branch of the pipeline activates when the matched
+advertisement carries a reference photograph of the product in the ad
+inventory. In this case the rewritten prompt is dispatched to the
+model's image-edit endpoint together with the reference image, so
+that the rendered product is visually grounded in the actual article
+rather than reconstructed from the model's prior over the product
+name. This is a small change in the API call but a significant change
+in the semantics of the output: it is what allows a generated scene
+to depict a recognisable, brand-accurate product rather than a
+plausible-looking generic substitute, and it is what makes the visual
+pipeline a meaningful extension of the textual ``instruct the
+generative model to weave in the ad'' design philosophy rather than a
+cosmetic copy of it. As with the chat path, a failure anywhere in the
+ad-related branches degrades the request to an unsponsored image
+generation: the user always receives an image, and the sponsored
+overlay is strictly additive.

@@ -1,0 +1,98 @@
+\subsection{Advertiser-Facing Surfaces}
+\label{subsec:advertiser-surfaces}
+
+The components described so far --- matching, re-ranking, engagement
+detection, and the adaptive feedback loop --- are all invisible to the
+advertiser. They live inside the request path of the chat service and
+communicate only with the assistant and the event store. For the system
+to function as a product rather than a research prototype, advertisers
+need a surface through which they can supply inventory, shape its
+targeting, fund its delivery, and inspect its performance. We divide this
+surface into two logically distinct layers: a transactional portal for
+managing campaign objects, and a read-only analytics layer for
+interpreting the events those campaigns generate.
+
+\subsubsection{Advertiser Portal and Campaign Management}
+\label{subsubsec:advertiser-portal}
+
+The advertiser portal is a thin REST layer, mounted under the
+\texttt{/portal} prefix of the same FastAPI service that serves the chat
+endpoint, which exposes CRUD operations over three nested resources:
+\emph{advertisers}, \emph{campaigns}, and \emph{ads}. An advertiser is
+the billing principal and owns one or more campaigns; a campaign groups
+ads under a shared budget and flight window; an ad is the smallest
+servable unit and carries the product metadata, targeting constraints,
+and creative text that the matching pipeline consumes.
+
+The resource hierarchy is enforced in the URL structure --- campaigns
+are reached as
+\texttt{/portal/advertisers/\{advertiser\_id\}/campaigns}, ads as
+\texttt{/portal/campaigns/\{campaign\_id\}/ads} --- so that ownership is
+unambiguous at every write and authorisation reduces to a prefix check.
+Each resource supports the usual five operations (\texttt{POST},
+\texttt{GET} list, \texttt{GET} by id, \texttt{PATCH}, and soft delete
+via a status field), and every mutation is validated against a Pydantic
+schema before it reaches the database. Budgets are represented as two
+independent scalars, a total budget and a daily budget, both enforced in
+the delivery path by the pacing logic described in
+Section~\ref{subsubsec:reranking-business-logic}; a campaign whose daily
+spend has been exhausted is filtered out of the candidate set for the
+remainder of the day rather than being deleted or re-prioritised.
+
+An important design choice is that the portal writes to the same
+PostgreSQL tables that the serving path reads from. There is no separate
+``staging'' database and no publish step: a newly created ad becomes
+eligible for serving as soon as its row is committed and the embedding
+worker has populated its vector in pgvector. This keeps the write path
+simple and eliminates a class of consistency bugs in which portal state
+and serving state drift, at the cost of requiring the embedding worker
+to be online for new ads to become servable. We consider this an
+acceptable trade because the embedding worker is a small, stateless
+service whose failure is easy to detect and whose catch-up on restart is
+bounded by the number of ads created during its outage.
+
+\subsubsection{Analytics API and Dashboards}
+\label{subsubsec:analytics-api}
+
+The analytics layer is intentionally a read-only projection over the
+events table rather than a second source of truth. Every metric the
+advertiser sees --- impressions, clicks, engagements, click-through
+rate, engagement rate, estimated revenue --- is computed by a SQL
+aggregation over the same \texttt{events} rows that the engagement
+detector writes in Section~\ref{subsubsec:llm-judge-engagement}. This
+discipline is what allows the feedback loop and the reporting surface
+to remain consistent by construction: an engagement that reshapes the
+next turn's ad selection is the same row that increments the
+engagement count on the dashboard, and no reconciliation job is needed
+between them.
+
+The API exposes three families of endpoints. A global summary endpoint,
+\texttt{GET /analytics/summary?days=N}, returns headline counters and a
+ranked list of top-performing ads over a rolling window and is used
+both by the internal admin view and by the top-of-dashboard cards on
+the advertiser side. A per-advertiser endpoint,
+\texttt{GET /portal/advertisers/\{id\}/analytics}, restricts the same
+aggregation to ads owned by a single advertiser and is the primary data
+source for the advertiser-facing dashboard. A per-campaign endpoint
+drills one level further and returns a daily time series suitable for
+the line charts on the campaign detail page. All three endpoints accept
+a \texttt{days} parameter and translate it into a SQL
+\texttt{WHERE timestamp >= NOW() - INTERVAL} clause; none of them
+maintain pre-aggregated tables, which we justify by noting that the
+events table is indexed on
+\texttt{(ad\_id, event\_type, timestamp)} and that the query volume
+from the dashboard is orders of magnitude below the write volume from
+the serving path.
+
+The React dashboard that consumes these endpoints is deliberately
+unambitious in scope. It provides four pages --- an overview with
+headline metrics and a time series chart, an advertisers list, a
+campaigns list scoped to a selected advertiser, and a campaign detail
+view with per-ad breakdowns --- and uses Recharts for all
+visualisations. Its visual language is inherited directly from the
+chat interface's stylesheet so that the two surfaces read as a single
+product rather than two assemblages. The dashboard performs no client-
+side aggregation and no caching beyond React Query's default
+stale-while-revalidate behaviour; every number on the screen is a
+direct reflection of a server-side query over the events table at the
+time the page was loaded.
