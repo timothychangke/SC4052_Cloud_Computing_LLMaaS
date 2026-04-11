@@ -1,0 +1,175 @@
+% ============================================================
+\subsection{Ad Serving and Matching}
+\label{subsec:ad-serving-matching}
+% ============================================================
+
+This subsection describes the path a user turn takes from the moment the
+orchestrator decides that an advertisement may be appropriate, to the moment a
+small ranked set of candidate ads is handed back to the response synthesis
+stage. We treat the problem as a two-stage retrieval-and-ranking pipeline: a
+high-recall semantic retrieval over a vector index, followed by a
+business-rules re-ranking step that enforces the economic and policy
+constraints of the platform. This decomposition mirrors the structure of
+modern web search and recommendation systems, where embedding-based recall is
+combined with a lightweight learned or hand-tuned re-ranker
+\cite{karpukhin2020dense}, but is adapted here to the constraints of a
+multi-turn conversational setting.
+
+\subsubsection{Ad Inventory, Campaigns, and Advertisers (PostgreSQL + pgvector)}
+\label{subsubsec:ad-inventory-store}
+
+The ad inventory is the system of record for every entity an advertiser cares
+about: the advertiser account itself, the campaigns it funds, and the
+individual creatives that may be served. We store all three in a single
+PostgreSQL instance, extended with the \texttt{pgvector} extension to support
+approximate nearest-neighbour search over dense embeddings. The decision to
+co-locate relational and vector data in PostgreSQL, rather than to introduce a
+dedicated vector database such as Pinecone or Weaviate, is deliberate. At the
+scale we target in this report (on the order of $10^3$--$10^5$ ads),
+\texttt{pgvector} with an IVFFlat index comfortably meets our latency budget,
+and keeping ads, budgets, and embeddings in the same transactional store
+removes an entire class of consistency bugs that arise when budget
+decrements and embedding lookups live in different systems.
+
+The schema is organised around three tables. The \texttt{advertisers} table
+holds account-level metadata and contact information. The \texttt{campaigns}
+table groups ads under a shared budget envelope, bid strategy, and flight
+window, and references an advertiser via a foreign key. The \texttt{ads}
+table holds the per-creative fields that the matching pipeline actually reads
+at request time:
+
+\begin{itemize}[leftmargin=1.4em,itemsep=2pt]
+    \item \textbf{Identity and content:} \texttt{ad\_id}, \texttt{title},
+          \texttt{description}, \texttt{cta\_url}, \texttt{product\_category}.
+    \item \textbf{Targeting:} a free-text \texttt{targeting\_context} field
+          that captures the kinds of conversational situations the advertiser
+          wants to reach (e.g.\ ``users researching marathon training shoes'').
+    \item \textbf{Economics:} \texttt{bid\_cpm}, \texttt{remaining\_budget},
+          \texttt{daily\_cap}, and \texttt{active} flag.
+    \item \textbf{Embedding:} a \texttt{vector(1536)} column populated at
+          ingestion time by the embedding pipeline of
+          Section~\ref{subsubsec:embedding-pipeline}.
+\end{itemize}
+
+An IVFFlat index is built on the embedding column using cosine distance as
+the similarity operator. The choice of cosine over inner product is motivated
+by the fact that the OpenAI \texttt{text-embedding-3-small} embeddings used in
+this work are not unit-normalised in a way that makes raw inner products
+meaningful for ranking across heterogeneous ad copy lengths. Cosine
+similarity is invariant to embedding magnitude and therefore yields more
+stable rankings when ad descriptions vary in length, which is the common case
+in our inventory.
+
+The \texttt{events} table, although logically part of the feedback loop
+described in Section~\ref{subsec:feedback-loop}, is co-located in the same
+database so that impression and click writes can participate in the same
+transaction as the budget decrement on the corresponding ad row. This is
+what allows us to make a strong claim later: a charged impression and a
+budget deduction either both happen or neither does.
+
+\subsubsection{Embedding and Semantic Matching Pipeline}
+\label{subsubsec:embedding-pipeline}
+
+Semantic matching in the system is built on the principle that the ad and
+the conversational context should be projected into the \emph{same} vector
+space, but from \emph{different} textual surfaces. On the ad side, we embed
+a concatenation of the title, description, product category, and targeting
+context; on the query side, we embed a structured serialisation of the
+output of the context extraction module
+(Section~\ref{subsubsec:context-extraction}), not the raw user message.
+
+This asymmetry is important and worth justifying. The raw user message is a
+poor query for two reasons. First, it is often short, casual, and lacks the
+domain vocabulary that ad copy is written in --- a user who says ``my knees
+are killing me after long runs'' shares almost no surface tokens with an ad
+titled ``Nike Pegasus 41 --- Cushioned Daily Trainer''. Second, intent in a
+conversational setting is distributed across turns, so any embedding of a
+single message systematically discards the accumulated context that the
+session store has been maintaining. By embedding the structured context
+object instead --- which contains the extracted intent, topics, entities, and
+purchase signal --- we obtain a query representation that is both richer and
+more lexically aligned with the way advertisers describe their products.
+
+Formally, let $f_\theta : \Sigma^* \to \mathbb{R}^{1536}$ denote the
+embedding model. For an ad $a$ with textual fields $T(a)$, the ingestion-time
+embedding is $\mathbf{e}_a = f_\theta(T(a))$, computed once and persisted in
+the \texttt{ads} table. For a user turn $m_t$ with conversation history $H$,
+let $C = \texttt{extract\_context}(m_t, H)$ be the structured context, and
+let $S(C)$ be its canonical serialisation. The query embedding is then
+$\mathbf{q} = f_\theta(S(C))$, computed at request time. Retrieval reduces to
+finding the top-$N$ ads under cosine similarity:
+\[
+    \mathit{Retrieve}(\mathbf{q}, N) \;=\;
+    \mathop{\mathrm{arg\,top}\text{-}N}_{a \in \mathcal{A}}\;
+    \frac{\mathbf{q}^\top \mathbf{e}_a}{\lVert \mathbf{q}\rVert\,\lVert \mathbf{e}_a\rVert}.
+\]
+We set $N = 20$, which empirically gives the downstream re-ranker enough
+diversity to enforce budget and frequency constraints without exhausting the
+inventory in low-fill regimes.
+
+Two practical optimisations are worth noting. First, the embedding call for
+the query is the second most expensive synchronous step in the pipeline
+(after response generation), so the orchestrator issues it in parallel with
+the tail end of context extraction whenever the structured context becomes
+incrementally available. Second, the IVFFlat index is warmed at process
+start by issuing a dummy nearest-neighbour query, which avoids a cold-cache
+penalty on the first real user turn after a deployment.
+
+\subsubsection{Re-Ranking, Budget Gating, and Business Logic}
+\label{subsubsec:reranking-business-logic}
+
+The output of semantic retrieval is a high-recall set of $N=20$ candidates
+that are \emph{topically} plausible but not yet economically or contextually
+admissible. The re-ranker is the component that turns this candidate set into
+a small ranked list ready for the response synthesis stage. It performs three
+jobs in sequence: \emph{filtering}, \emph{scoring}, and \emph{selection}.
+
+\paragraph{Filtering.} A candidate ad $a$ is admissible only if it satisfies
+the conjunction of the following predicates: (i) $a.\texttt{active}$ is true,
+(ii) $a.\texttt{remaining\_budget} > a.\texttt{bid\_cpm}/1000$ (i.e.\ the
+campaign can afford one more impression), and (iii) $a.\texttt{ad\_id}$ does
+not appear in the \texttt{ads\_shown\_this\_session} list maintained by Redis.
+The third predicate is the per-session frequency cap and is the simplest but
+most user-visible safeguard against repetition fatigue: a user who has
+already seen a Nike Pegasus mention in turn 3 will not see it again in turn 5,
+even if it remains the highest-similarity candidate. Filtering is performed
+in application code rather than as part of the SQL query because the
+session-level shown set lives in Redis, not in PostgreSQL, and we prefer to
+keep that boundary explicit.
+
+\paragraph{Scoring.} For each surviving candidate we compute a composite
+score that blends semantic relevance with the platform's economic objective
+and the inferred user state. Let $\mathrm{sim}(a)$ denote the cosine
+similarity between $\mathbf{q}$ and $\mathbf{e}_a$, and let
+$b_{\max} = \max_{a' \in \mathit{candidates}} a'.\texttt{bid\_cpm}$ be the
+maximum bid in the surviving set. We define
+\[
+    \mathit{score}(a) \;=\;
+    0.5 \cdot \mathrm{sim}(a)
+    \;+\; 0.3 \cdot \frac{a.\texttt{bid\_cpm}}{b_{\max}}
+    \;+\; 0.2 \cdot \mathit{purchase\_signal}(C),
+\]
+where $\mathit{purchase\_signal}(C) \in [0,1]$ is the scalar field produced
+by the context extraction module. Normalising bid by $b_{\max}$ rather than
+by a global constant keeps the bid term on the same scale as the other two
+across very different inventories, which is important during early-stage
+testing when the inventory is small and bid magnitudes are arbitrary.
+
+The weights $(0.5, 0.3, 0.2)$ are deliberately chosen to make relevance the
+dominant factor: even the highest bidder cannot displace a much more relevant
+ad, and a high purchase signal can act as a tie-breaker between two ads of
+similar relevance. We treat these weights as hand-tuned hyperparameters in
+this report; learning them from logged engagement data is a natural
+extension and is discussed in Section~\ref{subsec:future-work}.
+
+\paragraph{Selection.} The top $k=3$ scored candidates are returned to the
+orchestrator. Returning more than one allows the response synthesis prompt
+(Section~\ref{subsubsec:response-synthesis}) to gracefully fall back to a
+second-choice ad if the LLM judges the top candidate to be a poor
+contextual fit, without requiring a second round-trip to the database.
+
+Algorithm~\ref{alg:reranking} summarises the complete procedure as
+implemented in \texttt{get\_candidate\_ads}, which is the function exposed to
+the AI workstream through the interface contract of
+Table~\ref{tab:interface-contracts}.
+

@@ -1,0 +1,235 @@
+\begin{figure}[H]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+    font=\sffamily\small,
+    >=Stealth,
+    component/.style={draw, rounded corners=2pt, align=center,
+        minimum height=10mm, minimum width=28mm, fill=blue!5,
+        inner sep=3pt},
+    llm/.style={component, fill=orange!15, draw=orange!60!black},
+    store/.style={draw, cylinder, shape border rotate=90,
+        aspect=0.25, align=center, fill=green!10,
+        draw=green!50!black, minimum height=12mm, minimum width=22mm},
+    gate/.style={draw, diamond, aspect=2, align=center,
+        fill=red!10, draw=red!60!black, inner sep=1pt,
+        minimum width=20mm},
+    flow/.style={->, thick, draw=black!70},
+    async/.style={->, thick, dashed, draw=purple!70},
+    lbl/.style={font=\sffamily\scriptsize\itshape, text=black!60,
+        inner sep=1pt}
+]
+
+% ===== Row 0: Frontend =====
+\node[component, fill=blue!15] (fe) at (0, 6)
+    {React Chat UI\\\scriptsize (chat + image + analytics)};
+
+% ===== Row 1: Orchestrator (spans width) =====
+\node[component, fill=blue!20, minimum width=170mm] (orch) at (0, 4)
+    {FastAPI Orchestrator\\\scriptsize \texttt{/chat} \quad \texttt{/image} \quad \texttt{/track/click} \quad \texttt{/analytics} \quad \texttt{/portal}};
+
+% ===== Row 2: Sync pipeline (left to right) =====
+\node[llm]       (ctx)   at (-7.5, 1.2) {Context Extraction\\\scriptsize Claude Haiku\\\scriptsize \{intent, topics,\\\scriptsize sentiment, signals\}};
+\node[gate]      (gate)  at (-3.5, 1.2) {Receptivity\\Gate};
+\node[llm]       (emb)   at ( 0.0, 1.2) {Query Embedding\\\scriptsize text-embedding\\\scriptsize -3-small};
+\node[component] (retr)  at ( 3.8, 1.2) {Vector Retrieval\\\scriptsize pgvector\\\scriptsize top-20};
+\node[component] (rank)  at ( 7.6, 1.2) {Re-ranker\\\scriptsize sim+bid+signal\\\scriptsize freq-cap, budget};
+\node[llm]       (synth) at ( 11.6, 1.2) {Response Synthesis\\\scriptsize Claude Sonnet\\\scriptsize ad injection\\\scriptsize \texttt{[Sponsored]}};
+
+% ===== Row 3: Image branch =====
+\node[llm, fill=orange!8] (rewrite) at ( 3.8, -1.8)
+    {Placement Prompt\\Rewriter (Haiku)};
+\node[llm, fill=orange!8] (img)     at ( 7.6, -1.8)
+    {\texttt{gpt-image-1}\\\scriptsize generate / edit};
+
+% ===== Right column: Data stores =====
+\node[store] (redis) at (-7.5, -1.5)
+    {Redis\\\scriptsize Session State\\\scriptsize 10-turn window\\\scriptsize ads\_shown};
+\node[store] (pg)    at (-7.5, -4.5)
+    {PostgreSQL\\+ pgvector\\\scriptsize ads, embeddings,\\\scriptsize events (JSONB)};
+
+% ===== Row 4: Async feedback =====
+\node[llm, fill=purple!8, draw=purple!60] (judge) at ( 3.8, -4.8)
+    {Engagement / LLM-Judge\\\scriptsize follow-up classifier\\\scriptsize naturalness scorer};
+\node[component, fill=purple!8, draw=purple!60] (opt) at ( 9.0, -4.8)
+    {Context Optimiser\\\scriptsize topic decay,\\\scriptsize ad-fatigue update};
+
+% ===== Sync flow arrows =====
+\draw[flow] (fe) -- node[lbl, right]{user msg / image} (orch);
+\draw[flow] (orch.south -| ctx)   -- (ctx.north);
+\draw[flow] (ctx) -- (gate);
+\draw[flow] (gate) -- node[lbl, above]{receptive} (emb);
+\draw[flow] (emb) -- (retr);
+\draw[flow] (retr) -- (rank);
+\draw[flow] (rank) -- (synth);
+\draw[flow] (synth.north) -- (synth.north |- orch.south);
+
+% Gate bypass (skip ads) — routed below the pipeline row
+\draw[flow] (gate.south) -- ++(0,-0.5)
+    -| node[lbl, near start, below]{\texttt{none} $\Rightarrow$ skip} (synth.south);
+
+% Image branch
+\draw[flow] (rank.south) -- ++(0,-0.6) -| (rewrite.north);
+\draw[flow] (rewrite) -- (img);
+\draw[flow] (img.east) -- ++(0.6,0) |- (orch.south east);
+
+% Stores
+\draw[flow, <->] (orch.west) -| node[lbl, near start, above]{session R/W} (redis.north);
+\draw[flow] (retr.west) -- ++(-0.4,0) |- (pg.east);
+\draw[flow] (rank.west) -- ++(-0.2,0) |- (redis.east);
+
+% Async loop
+\draw[async] (pg.south) |- node[lbl, near end, above]{events} (judge.west);
+\draw[async] (judge) -- (opt);
+\draw[async] (opt.north) -- ++(0,0.6) -| 
+    node[lbl, near start, right]{updated context} (redis.south);
+
+% ===== Legend (bottom-left, away from everything) =====
+\matrix [draw, rounded corners=2pt, fill=white,
+         row sep=2pt, column sep=4pt,
+         nodes={font=\scriptsize\sffamily, anchor=west},
+         ampersand replacement=\&] at (-6.5, -7.8) {
+  \node[component, minimum width=5mm, minimum height=3mm]{}; \& \node{Service}; \&
+  \node[llm, minimum width=5mm, minimum height=3mm]{};       \& \node{LLM call}; \\
+  \node[store, minimum width=5mm, minimum height=3mm]{};     \& \node{Data store}; \&
+  \node[gate, minimum width=5mm, minimum height=3mm]{};      \& \node{Safety gate}; \\
+  \draw[flow] (0,0) -- (5mm,0);  \& \node{Sync path}; \&
+  \draw[async] (0,0) -- (5mm,0); \& \node{Async loop}; \\
+};
+
+\end{tikzpicture}%
+}
+\caption{High-level system architecture of the Ad LLM platform...}
+\label{fig:architecture}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+    font=\sffamily\small,
+    >=Stealth,
+    node distance=6mm and 8mm,
+    component/.style={draw, rounded corners=2pt, align=center,
+        minimum height=8mm, minimum width=22mm, fill=blue!5,
+        inner sep=3pt},
+    llm/.style={component, fill=orange!15, draw=orange!60!black},
+    store/.style={draw, cylinder, shape border rotate=90,
+        aspect=0.25, align=center, fill=green!10,
+        draw=green!50!black, minimum height=10mm, minimum width=18mm},
+    gate/.style={draw, diamond, aspect=2, align=center,
+        fill=red!10, draw=red!60!black, inner sep=1pt},
+    group/.style={draw, dashed, rounded corners=4pt,
+        inner sep=4mm, fill=gray!3},
+    flow/.style={->, thick, draw=black!70},
+    async/.style={->, thick, dashed, draw=purple!70},
+    label/.style={font=\sffamily\scriptsize\itshape, text=black!60}
+]
+
+% ===== Frontend =====
+\node[component, fill=blue!15] (fe) {React Chat UI\\\scriptsize (chat + image + analytics)};
+
+% ===== Orchestrator =====
+\node[component, below=10mm of fe, fill=blue!20, minimum width=70mm]
+    (orch) {FastAPI Orchestrator\\\scriptsize \texttt{/chat} \quad \texttt{/image} \quad \texttt{/track/click} \quad \texttt{/analytics} \quad \texttt{/portal}};
+
+% ===== Synchronous chat pipeline =====
+\node[llm, below left=12mm and -15mm of orch] (ctx)
+    {Context Extraction\\\scriptsize Claude Haiku\\\scriptsize \{intent, topics, entities,\\\scriptsize sentiment, purchase\_signal,\\\scriptsize ad\_receptivity\}};
+
+\node[gate, right=10mm of ctx] (gate)
+    {Receptivity\\Gate};
+
+\node[llm, right=8mm of gate] (emb)
+    {Query Embedding\\\scriptsize text-embedding-3-small};
+
+\node[component, below=8mm of emb] (rank)
+    {Re-ranker\\\scriptsize sim$\cdot$0.5 + bid$\cdot$0.3\\\scriptsize + signal$\cdot$0.2\\\scriptsize freq-cap, budget filter};
+
+\node[component, left=8mm of rank] (retr)
+    {Vector Retrieval\\\scriptsize pgvector top-20};
+
+\node[llm, left=8mm of retr] (synth)
+    {Response Synthesis\\\scriptsize Claude Sonnet\\\scriptsize prompt-level\\\scriptsize ad injection\\\scriptsize \texttt{[Sponsored]} marker};
+
+% ===== Image generation branch =====
+\node[llm, below=14mm of synth, fill=orange!8] (rewrite)
+    {Placement Prompt\\Rewriter\\\scriptsize (Haiku)};
+\node[llm, right=8mm of rewrite, fill=orange!8] (img)
+    {\texttt{gpt-image-1}\\\scriptsize generate / edit\\\scriptsize w. reference photo};
+
+% ===== Data stores =====
+\node[store, right=18mm of orch] (redis)
+    {Redis\\\scriptsize Session State\\\scriptsize 10-turn window\\\scriptsize signals history\\\scriptsize ads\_shown};
+\node[store, below=10mm of redis] (pg)
+    {PostgreSQL\\+ pgvector\\\scriptsize ads, embeddings,\\\scriptsize events (JSONB)};
+
+% ===== Async feedback loop =====
+\node[llm, below=14mm of img, fill=purple!8, draw=purple!60]
+    (judge) {Engagement / LLM-Judge\\\scriptsize follow-up classifier\\\scriptsize naturalness scorer};
+\node[component, right=10mm of judge, fill=purple!8, draw=purple!60]
+    (opt) {Context Optimiser\\\scriptsize topic decay,\\\scriptsize signal smoothing,\\\scriptsize ad-fatigue update};
+
+% ===== Sync flow arrows =====
+\draw[flow] (fe) -- node[label,right]{user msg / image prompt} (orch);
+\draw[flow] (orch.south) |- (ctx.east);
+\draw[flow] (ctx) -- (gate);
+\draw[flow] (gate) -- node[label,above]{receptive} (emb);
+\draw[flow] (emb) -- (rank);
+\draw[flow] (rank) -- (retr);
+\draw[flow] (retr) -- (synth);
+\draw[flow] (synth.north) -- ++(0,4mm) -| (orch.south);
+\draw[flow] (gate.south) |- ++(0,-22mm) -| node[label,near start,below]{\texttt{none} $\Rightarrow$ skip ads}(synth.south);
+
+% Image branch
+\draw[flow] (rank.south) |- (rewrite.east);
+\draw[flow] (rewrite) -- (img);
+\draw[flow] (img.north) -- ++(0,3mm) -| (orch.south east);
+
+% Stores
+\draw[flow,<->] (orch.east) -- node[label,above]{session R/W} (redis.west);
+\draw[flow] (retr.east) -- ++(8mm,0) |- (pg.west);
+\draw[flow] (rank.east) -- ++(4mm,0) |- (redis.south west);
+\draw[flow] (orch.east) -- ++(6mm,0) |- node[label,near end,above]{impression / click} (pg.north west);
+
+% Async loop
+\draw[async] (pg.south) |- node[label,near end,above]{follow-up turn + shown ad} (judge.east);
+\draw[async] (judge) -- node[label,above]{engagement event} (opt);
+\draw[async] (opt.north) -- ++(0,6mm) -| node[label,near start,right]{updated ad context} (redis.south);
+
+% Legend
+\matrix [draw, below right=2mm and -30mm of pg, row sep=1pt, column sep=2pt,
+         nodes={font=\scriptsize\sffamily, anchor=west}, ampersand replacement=\&] {
+  \node[component, minimum width=4mm, minimum height=3mm]{}; \& \node{Service}; \\
+  \node[llm, minimum width=4mm, minimum height=3mm]{}; \& \node{LLM call}; \\
+  \node[store, minimum width=4mm, minimum height=3mm]{}; \& \node{Data store}; \\
+  \node[gate, minimum width=4mm, minimum height=3mm]{}; \& \node{Safety gate}; \\
+  \draw[flow] (0,0) -- (4mm,0); \& \node{Sync path}; \\
+  \draw[async] (0,0) -- (4mm,0); \& \node{Async loop}; \\
+};
+
+\end{tikzpicture}%
+}
+\caption{High-level system architecture of the Ad LLM platform.}
+\label{fig:architecture}
+\end{figure}
+
+\begin{table}[H]
+    \centering
+    \caption{Technology stack summary.}
+    \label{tab:tech-stack}
+    \begin{tabular}{@{}ll@{}}
+        \toprule
+        \textbf{Component}          & \textbf{Technology}                   \\ \midrule
+        Frontend                    & React                                 \\
+        Orchestrator API            & FastAPI (Python)                      \\
+        Session Store               & Redis                                 \\
+        Database                    & PostgreSQL + pgvector                 \\
+        Embedding Model             & text-embedding-3-small (OpenAI)       \\
+        Context Extraction LLM      & Claude Haiku (lightweight)            \\
+        Response Generation LLM     & Claude Sonnet (capable)               \\
+        Image Generation Model      & \texttt{gpt-image-1}                  \\
+        Event Logging               & PostgreSQL (JSONB payload)            \\
+        \bottomrule
+    \end{tabular}
+\end{table}

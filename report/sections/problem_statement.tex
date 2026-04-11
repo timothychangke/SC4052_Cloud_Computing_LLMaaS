@@ -1,0 +1,193 @@
+% ============================================================
+\section{Problem Statement}
+\label{sec:problem-statement}
+% ============================================================
+
+This section formalises the problem addressed by the present work. We first
+explain why the inventory of advertising formats inherited from the visual web
+fails to transfer to conversational interfaces, then enumerate the technical
+sub-problems that any LLM-native advertising system must solve, then state the
+ethical constraints that bound the admissible solution space, and finally
+present a precise formal definition of the task.
+
+\subsection{Limitations of Traditional Ad Formats in Conversational AI}
+\label{subsec:traditional-ad-limitations}
+
+Three families of advertising formats dominate the contemporary web, and each
+fails to transfer to a conversational setting for a structural reason rather
+than an incidental one.
+
+\emph{Display advertising}---banners, sidebars, and in-feed units---presupposes
+a two-dimensional visual canvas in which a rectangular region can be reserved
+for sponsored content without disturbing the primary content stream. A chat
+interface offers no such region. The output of an LLM is a single linear
+sequence of tokens rendered as flowing text, and any attempt to reintroduce a
+sidebar or banner reasserts the very visual paradigm that conversational
+systems were designed to replace.
+
+\emph{Interruption-based formats}---pre-roll video, interstitials, and modal
+overlays---monetise attention by suspending the user's task for a fixed
+duration. In a conversational exchange, an interruption between the user's
+question and the assistant's answer breaks the implicit contract that the
+system responds to what was asked. The cost of such an interruption is not
+merely an aesthetic complaint; it directly degrades the property---fluid
+turn-taking---that makes conversational interfaces valuable in the first place.
+
+\emph{Search advertising} appears at first glance to be the closest analogue,
+since both search and chat are text-driven and intent-rich. The analogy is
+nevertheless misleading. A search query is a short, atomic keyword expression
+matched against a bid space by exact and approximate string operators. A
+conversational query is multi-turn: the relevant intent is distributed across
+several user messages, refined by clarifying questions, and frequently never
+expressed as a single noun phrase. A keyword auction operating on the most
+recent user message alone discards the bulk of the signal that the conversation
+contains.
+
+The conclusion is that advertising in conversational AI is not a porting
+problem. It requires a format that is itself conversational---one in which
+sponsored content is integrated into the assistant's reply as a natural
+recommendation rather than appended as a foreign object.
+
+\subsection{Technical Challenges}
+\label{subsec:technical-challenges}
+
+Designing such a format raises four technical sub-problems that must be solved
+jointly.
+
+\subsubsection{Real-Time Intent Extraction from Multi-Turn Conversations}
+\label{subsubsec:intent-extraction}
+
+Let $H_t = (m_1, m_2, \ldots, m_{t-1})$ denote the conversation history up to
+turn $t$ and $m_t$ the current user message. The system must produce, in real
+time, a structured representation $C_t = \phi(H_t, m_t)$ that captures the
+user's latent commercial intent, the topical focus of the conversation, the
+strength of any purchase signal, and the user's receptivity to advertising at
+the present moment. The mapping $\phi$ cannot be reduced to keyword extraction:
+purchase intent often emerges only when a sequence of exploratory questions is
+considered jointly, and receptivity depends on conversational register
+(casual chit-chat, technical research, emotional disclosure) rather than on any
+single lexical cue. The extraction must additionally complete within a latency
+budget compatible with interactive use, ruling out heavyweight inference.
+
+\subsubsection{Semantic Ad Matching at Low Latency}
+\label{subsubsec:semantic-matching}
+
+Given the extracted context $C_t$ and an ad inventory
+$\mathcal{A} = \{a_1, \ldots, a_N\}$, the system must select a small set of
+candidate advertisements that are semantically aligned with the conversation.
+Lexical matching against ad metadata is insufficient: a user discussing
+``training for a half marathon'' should surface running shoes even though the
+phrase ``running shoes'' never appears in the dialogue. The matching function
+must therefore operate in a semantic space, must respect business constraints
+(active campaigns, positive remaining budget, frequency caps), and must be
+computable within a few hundred milliseconds over inventories that may grow to
+tens of thousands of items. A composite scoring rule is required, in which
+semantic similarity, advertiser bid, and the inferred purchase signal are
+combined into a single ranking criterion whose weights are interpretable and
+auditable.
+
+\subsubsection{Natural Ad Integration Without Degrading User Experience}
+\label{subsubsec:natural-integration}
+
+Even a perfectly matched advertisement is worthless if it is appended to the
+response as a foreign block. The selected ad $a^\star$ must be woven into the
+assistant's reply as a recommendation that flows from the surrounding text,
+while a mandatory disclosure marker---we adopt the literal token
+\texttt{[Sponsored]}---must accompany every commercial mention to satisfy
+regulatory requirements. Two failure modes must be excluded by construction:
+the assistant must not promote $a^\star$ when no candidate is genuinely
+relevant to the user's question, and it must not produce a response in which
+the disclosure is omitted, hidden, or rephrased. Both constraints place a
+non-trivial burden on the prompt that drives the response-synthesis stage,
+since the model must be simultaneously encouraged to recommend and permitted
+to refuse.
+
+\subsubsection{Engagement Measurement Beyond Clicks}
+\label{subsubsec:engagement}
+
+Click-through rate, the canonical metric of digital advertising, is poorly
+suited to conversational interfaces. Clicks are sparse---most users do not
+leave the conversation to visit an external page---and a click measures only
+the act of departure, not the quality of attention. A more faithful signal is
+available in the conversation itself: when a user follows a sponsored mention
+with a question about the advertised product, that follow-up is direct
+evidence that the advertisement entered the user's working model of the
+exchange. Detecting such follow-ups requires a classifier that takes both the
+prior advertisement and the next user message as input, and that distinguishes
+genuine engagement from coincidental topical overlap. We treat this engagement
+event as a first-class metric, complementary to and stronger than the click.
+
+\subsection{Ethical and Regulatory Considerations}
+\label{subsec:ethical-considerations}
+
+Conversational advertising operates in a setting of elevated user trust. A
+chat assistant is perceived---accurately or not---as a neutral helper, and any
+recommendation it issues carries the weight of that perceived neutrality. This
+raises three constraints that the system must respect.
+
+\emph{Disclosure.} United States Federal Trade Commission guidance requires
+that sponsored content be identified clearly and conspicuously. We adopt the
+explicit token \texttt{[Sponsored]} adjacent to every commercial mention, and
+treat the absence of this token as a hard failure of the response-synthesis
+stage rather than a stylistic preference.
+
+\emph{Sensitivity gating.} Certain conversational contexts---disclosures of
+illness, bereavement, financial distress, or acute emotional difficulty---are
+incompatible with advertising of any kind. The context-extraction stage must
+therefore emit not only a positive receptivity score but also an explicit
+\emph{none} value that causes the matching pipeline to be bypassed entirely.
+This is treated as an inviolable safeguard: under sensitivity gating, no
+advertisement is shown regardless of bid, similarity, or budget.
+
+\emph{Data minimisation.} Session state is retained only for the duration of
+an active conversation, with a fixed inactivity expiry. No persistent user
+profile is constructed across sessions, and no session content is shared with
+advertisers beyond the aggregate impression and engagement counters required
+for billing.
+
+These constraints are not soft preferences. They define the admissible region
+of the design space and any solution that violates them is rejected
+\emph{a priori}, irrespective of its performance on other metrics.
+
+\subsection{Formal Problem Definition}
+\label{subsec:formal-problem}
+
+We may now state the problem precisely. Let $\mathcal{M}$ denote the space of
+natural-language messages and $\mathcal{A}$ a finite ad inventory. At turn $t$
+the system observes a history $H_t \in \mathcal{M}^{t-1}$ and a user message
+$m_t \in \mathcal{M}$, and must produce a tuple
+\[
+    \big(r_t,\; \alpha_t,\; e_t\big)
+    \;\in\; \mathcal{M} \times \big(\mathcal{A} \cup \{\varnothing\}\big)
+                       \times \mathcal{E},
+\]
+where $r_t$ is the assistant's reply, $\alpha_t$ is the advertisement embedded
+in $r_t$ (or $\varnothing$ if none is shown), and $e_t$ is the set of
+engagement events logged for downstream analytics. The tuple is required to
+satisfy the following conditions.
+
+\begin{description}[leftmargin=2.2em,style=nextline]
+    \item[(C1) Helpfulness.] The reply $r_t$ answers the user's query in $m_t$
+        on its own merits, independently of whether an advertisement is
+        included.
+    \item[(C2) Relevance-conditional injection.] If $\alpha_t \neq \varnothing$,
+        then $\alpha_t$ is semantically aligned with the inferred context
+        $C_t = \phi(H_t, m_t)$ and lies within the active, budgeted, and
+        frequency-cap-eligible subset of $\mathcal{A}$.
+    \item[(C3) Mandatory disclosure.] If $\alpha_t \neq \varnothing$, then
+        $r_t$ contains the disclosure marker \texttt{[Sponsored]} adjacent to
+        the mention of $\alpha_t$.
+    \item[(C4) Sensitivity gating.] If $C_t$ indicates a sensitive context,
+        then $\alpha_t = \varnothing$ and no element of $\mathcal{A}$ is
+        evaluated for inclusion.
+    \item[(C5) Latency.] The end-to-end production of $(r_t, \alpha_t, e_t)$
+        completes within a fixed wall-clock budget compatible with interactive
+        chat.
+\end{description}
+
+The objective is to design a system that satisfies (C1)--(C5) on every turn
+while maximising a composite utility that rewards both user-perceived
+helpfulness and verifiable advertiser engagement. The remainder of this report
+develops such a system, presents the architectural decisions that realise each
+of (C1)--(C5), and evaluates the resulting platform on a curated set of
+representative conversations.

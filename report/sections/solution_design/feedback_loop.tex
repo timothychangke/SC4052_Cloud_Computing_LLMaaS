@@ -1,0 +1,129 @@
+% ============================================================
+\subsection{Feedback Loop and Adaptation}
+\label{subsec:feedback-loop}
+% ============================================================
+
+The components described so far are sufficient to serve a single ad on a
+single turn, but they are not sufficient to make the system \emph{learn} from
+its own behaviour. This subsection describes the asynchronous feedback loop
+that observes user reactions to served ads, distinguishes genuine engagement
+from noise, and feeds that signal back into the matching pipeline. We regard
+this loop as one of the central contributions of the project, because it is
+the part of the design that takes seriously the observation that
+conversational ads cannot be evaluated by clicks alone.
+
+\subsubsection{Click Tracking, Event Logging, and Budget Accounting}
+\label{subsubsec:click-tracking}
+
+Every ad that appears in a user-facing response carries a call-to-action URL.
+Rather than expose the advertiser's destination URL directly, the orchestrator
+rewrites it at synthesis time into a tracked redirect of the form
+\texttt{/track/click?ad\_id=X\&session\_id=Y\&redirect=Z}, where $Z$ is the
+URL-encoded original destination. When the user clicks the link, the
+\texttt{/track/click} endpoint writes a \texttt{click} event to the
+\texttt{events} table and issues a 302 redirect to $Z$. The user perceives a
+single click; the system gains a logged interaction tied to the originating
+session and ad.
+
+The event model is uniform across the four event types we record:
+\texttt{impression}, \texttt{click}, \texttt{engagement}, and
+\texttt{conversion}. Each row carries an \texttt{event\_id}, an
+\texttt{ad\_id}, a \texttt{session\_id}, a \texttt{turn\_index}, a UTC
+timestamp, and a JSONB \texttt{payload} column for type-specific fields
+(e.g.\ the classifier confidence for an engagement event, or the referring
+turn for a click). Storing the type-specific fields in JSONB rather than in
+separate tables keeps the analytics queries simple --- a single
+\texttt{GROUP BY event\_type} suffices to compute most dashboard metrics ---
+at the cost of giving up some compile-time schema enforcement, which we
+judge an acceptable trade for a research prototype.
+
+Budget accounting is tied to the impression event. When the orchestrator
+logs an impression, it does so in the same PostgreSQL transaction that
+decrements \texttt{remaining\_budget} on the corresponding ad row by
+$\texttt{bid\_cpm}/1000$. Because the event insert and the budget decrement
+are atomic, the system maintains the invariant that the sum of charged
+impressions per ad, multiplied by its CPM, equals the total amount drawn
+down from its budget. This is the property that lets the analytics layer
+report revenue numbers that reconcile with the database rather than drift
+from it over time.
+
+\subsubsection{LLM-Judge-Based Engagement Detection}
+\label{subsubsec:llm-judge-engagement}
+
+Clicks are a poor primary signal in a conversational setting. A user who is
+intrigued by a sponsored mention is far more likely to ask a follow-up
+question about the product than to click an inline link, and yet that
+follow-up is exactly the kind of behaviour that classical ad analytics is
+blind to. The engagement detection module is the system's answer to this
+mismatch: it inspects the user's \emph{next} turn after an ad was served and
+decides whether that turn constitutes engagement with the advertised product.
+
+We implemented this in two stages. The first stage is a cheap keyword and
+entity matcher: if the next user message contains the ad's product name,
+brand, or any of the entities extracted from its title, we tentatively flag
+the turn as engaged. This catches the easy cases (``tell me more about the
+Pegasus 41'') at essentially zero cost. The second stage, invoked only when
+the first stage is ambiguous, is a lightweight LLM judge --- the same
+Haiku-tier model used for context extraction --- prompted with the served ad,
+the previous assistant turn, and the new user turn, and asked to return a
+boolean \texttt{engaged} field together with a short rationale and a
+confidence score in $[0,1]$.
+
+The two-stage design is a deliberate latency and cost optimisation. The
+keyword stage handles the majority of true positives without any model call;
+the LLM stage handles the genuinely ambiguous cases, where the user
+paraphrases (``how durable are those shoes you mentioned?'') or asks an
+implicit follow-up. When the LLM judge returns \texttt{engaged = true} with
+confidence above a threshold $\tau = 0.7$, an \texttt{engagement} event is
+written to the events table with the rationale stored in the JSONB payload.
+We treat this event as a strictly stronger signal than a click, both in the
+analytics dashboard and, as described next, in the adaptive layer that
+modulates future ad selection.
+
+It is worth being explicit about what the engagement detector is \emph{not}.
+It is not a sentiment classifier, and it does not try to decide whether the
+user liked the ad. It only decides whether the user's next turn is
+\emph{about} the advertised product. Whether that engagement is positive,
+negative, or neutral is left to downstream analysis; what matters for the
+feedback loop is that the user's attention measurably moved towards the ad.
+
+\subsubsection{Adaptive Ad Context Optimisation}
+\label{subsubsec:adaptive-optimisation}
+
+The final piece of the feedback loop closes it: engagement events are not
+merely logged for reporting, they actively reshape what the matching
+pipeline does on subsequent turns. We call this \emph{adaptive ad context
+optimisation}, and it operates at two granularities.
+
+\paragraph{Within-session adaptation.} When an engagement event is recorded
+for an ad $a$ in session $s$, the orchestrator updates the Redis session
+state for $s$ in two ways. First, the topics and entities associated with
+$a$ are merged into the session's \texttt{accumulated\_topics} list, which
+biases the next round of context extraction towards the same product
+neighbourhood. Second, the session's \texttt{purchase\_signal} is bumped
+upward by a fixed increment $\Delta = 0.15$, capped at $1.0$. The effect on
+the very next turn is concrete and measurable: the query embedding shifts
+toward the engaged-with topic, and the re-ranker's purchase-signal term
+increases, jointly making it more likely that a related and complementary
+ad surfaces if one exists in the inventory.
+
+\paragraph{Cross-session adaptation.} At the inventory level, engagement and
+click events feed a slow-moving per-ad quality score
+$q_a \in [0,1]$, computed as a smoothed engagement-plus-click rate over the
+ad's recent impressions. This score is not part of the per-request scoring
+formula in Section~\ref{subsubsec:reranking-business-logic} --- introducing
+it there would risk a runaway feedback loop in which a few early lucky
+impressions monopolise future serving --- but it is exposed to the analytics
+dashboard and used to surface under-performing ads to the (currently
+manual) inventory review process. A learned re-ranker that incorporates
+$q_a$ directly, with appropriate exploration, is the natural next step and
+is sketched in Section~\ref{subsec:future-work}.
+
+Taken together, these two granularities give the system a feedback loop
+with two distinct time constants: a fast, within-session loop that adapts
+the next turn's ad selection to what the user just engaged with, and a
+slow, cross-session loop that lets the inventory as a whole drift toward
+ads that consistently earn user attention. Neither loop requires
+labelled training data or a separate model training pipeline; both are
+driven entirely by the events that the system already records as part of
+its normal operation.

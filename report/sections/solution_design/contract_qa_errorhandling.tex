@@ -1,0 +1,196 @@
+\subsection{Interface Contracts and Workstream Division}
+\label{subsec:interface-contracts}
+
+A system of this size is only tractable to build if its seams are chosen
+deliberately rather than allowed to congeal around whoever happened to
+write the first line of code in each area. We therefore fixed the
+interfaces between major components in Week~1, before any production
+implementation existed on either side of them, and treated those
+interfaces as frozen artefacts that could be changed only by mutual
+agreement. The pay-off is that the two human workstreams --- a backend
+workstream covering the orchestrator, database, portal, and event
+pipeline, and an AI/LLM workstream covering context extraction, vector
+search, re-ranking, response generation, and engagement judging ---
+were able to develop in parallel against typed mocks of one another and
+integrate in a single short sitting rather than in a protracted
+debugging phase.
+
+The contract is expressed as a small set of Python dataclasses and
+asynchronous function signatures. Four data types carry almost the
+entire load. A \texttt{Turn} is an immutable record of one message in a
+conversation, tagged with its role, timestamp, and the identifier of
+any ad that was shown alongside it. A \texttt{ContextObject} is the
+structured projection of a user's most recent turn, carrying an
+enumerated \texttt{intent}, a list of topics and entities, a sentiment
+label, a purchase-signal scalar in $[0,1]$, and an \texttt{ad\_receptivity}
+enum whose \texttt{none} value short-circuits the matching pipeline
+entirely for sensitive conversations. An \texttt{Ad} is the unit of
+inventory, carrying targeting metadata, creative text, brand-safety
+tags, a bid in CPM, a remaining budget, and two optional fields ---
+\texttt{similarity} and \texttt{score} --- that are populated in
+sequence by the vector search and the re-ranker. A
+\texttt{ResponseObject} is what the orchestrator returns to the
+frontend: a response text, a boolean indicating whether an ad was
+included, and the identifier of the ad used if so. The enums
+(\texttt{Intent}, \texttt{AdReceptivity}) are part of the contract
+rather than free-form strings so that a typo on one side of the seam
+becomes a type error at import time rather than a silent mismatch at
+runtime.
+
+Four asynchronous function signatures then pin down the call graph
+between the workstreams. \texttt{extract\_context(message, history)
+\(\to\) ContextObject} is owned by the AI workstream and called by the
+orchestrator once per user turn. \texttt{match\_ads(context, session\_id)
+\(\to\) list[Ad]} is also owned by the AI workstream and encapsulates
+the embedding, vector search, and re-ranking stages behind a single
+entry point, so that the backend need not know whether matching is
+performed by a single model call or a multi-stage pipeline.
+\texttt{generate\_response(message, history, ad)\(\to\) ResponseObject}
+is the main model call that weaves the selected ad (if any) into a
+helpful answer. Finally,
+\texttt{judge\_engagement(ad, prev\_assistant\_turn, user\_turn) \(\to\)
+EngagementVerdict} is the post-hoc judge described in
+Section~\ref{subsubsec:llm-judge-engagement}. Everything that is not in
+this list --- database access, Redis session state, event writes,
+portal CRUD, budget pacing --- is owned unambiguously by the backend
+workstream and is invisible to the AI workstream except through these
+four functions.
+
+The division of labour has two consequences worth naming. First, either
+side can be replaced wholesale without touching the other: swapping the
+matching pipeline for a learned end-to-end ranker, or swapping the
+Postgres event store for a streaming pipeline, requires changes only
+inside one workstream's boundary. Second, testing becomes local. The
+backend workstream tests against a deterministic stub of the AI
+functions that returns canned \texttt{ContextObject} and \texttt{Ad}
+values; the AI workstream tests against an in-memory fake of the
+session store and event writer. Neither side needs the other to be
+running in order to validate its own invariants.
+
+\subsection{Quality Assurance and Evaluation Framework}
+\label{subsec:qa-framework}
+
+Evaluating a conversational ad system is harder than evaluating either
+a chat model or a classical ad ranker in isolation, because the quality
+of a served ad is a joint function of its relevance to the turn, its
+compatibility with the surrounding assistant prose, and its effect on
+the user's subsequent behaviour. We therefore adopt a layered
+evaluation framework in which each component is held to a local
+correctness criterion and the system as a whole is judged against a
+small number of end-to-end metrics that reflect the product's stated
+value proposition.
+
+At the component level, three properties are checked continuously.
+Context extraction is evaluated for \emph{schema validity} and
+\emph{label stability}: the Haiku-tier extractor must return a
+\texttt{ContextObject} that parses against the dataclass schema on
+every call, and its labels on a fixed regression set of fifty hand-
+annotated turns must remain stable across prompt revisions. A failure
+of the first property is caught at parse time and triggers a fallback
+to a conservative default; a failure of the second is caught by a
+nightly job that diffs the extractor's output against the regression
+set and opens an alert if agreement drops below a threshold. Vector
+search is evaluated for \emph{recall at 20} on a small synthetic set
+of query--ad pairs constructed from the inventory's own product
+descriptions, which gives a cheap, self-generated benchmark that
+automatically tracks changes in the embedding model or the inventory.
+The re-ranker is evaluated by \emph{rank correlation} between its
+output ordering and the ordering induced by the unmodulated similarity
+score, with the expectation that the two should diverge in
+interpretable ways --- budget-exhausted ads should fall, high
+purchase-signal sessions should see higher-bid ads rise --- and that
+the divergence itself is what the unit tests assert.
+
+At the end-to-end level, the system is judged on three metrics.
+\emph{Engagement rate}, the fraction of served ads whose subsequent
+user turn is flagged as engaged by the judge of
+Section~\ref{subsubsec:llm-judge-engagement}, is the headline quality
+metric and is the one that the feedback loop optimises against.
+\emph{Click-through rate} is reported alongside it as a secondary
+metric, mainly for comparability with conventional ad analytics.
+\emph{Injection appropriateness} is the rate at which ads are served
+into turns whose \texttt{ad\_receptivity} is \texttt{high} or
+\texttt{medium} and suppressed on turns whose receptivity is
+\texttt{low} or \texttt{none}; this metric exists to catch regressions
+in the sensitivity classifier independently of whether the served ads
+are themselves good, because an inappropriately-placed ad is a product
+failure even if the user happens to engage with it.
+
+We deliberately do not use offline A/B testing as a primary evaluation
+tool. The feedback loop described in
+Section~\ref{subsubsec:adaptive-optimisation} means that serving
+decisions on one turn shape context on subsequent turns within the
+same session, which violates the independence assumption that
+conventional A/B tests rely on. Instead, we rely on the regression
+sets and rank-correlation tests above to catch local regressions, and
+on the headline engagement rate to track global drift. A principled
+bandit-style evaluation that respects the within-session dependency
+structure is sketched in Section~\ref{subsec:future-work} as the
+natural successor to the current framework.
+
+\subsection{Error Handling and Graceful Degradation}
+\label{subsec:error-handling}
+
+The serving path touches three external systems that can each fail
+independently --- a Postgres instance with a pgvector extension, a
+Redis instance holding session state, and one or more remote LLM
+endpoints --- and any production deployment must answer the question
+of what the user sees when one of them is unreachable or slow. Our
+guiding principle is that \emph{the chat response is the product},
+and that every component in the ad pipeline is expendable in the
+service of delivering a timely, coherent answer to the user. No
+failure in the ad pipeline should ever degrade the conversational
+experience, and no ad should ever be served on the back of partial or
+inconsistent data.
+
+This principle is realised as a small number of explicit fallback
+paths, each triggered by a specific class of failure. A failure of the
+context extractor --- whether a timeout, a malformed JSON response, or
+a schema validation error --- causes the orchestrator to substitute a
+default \texttt{ContextObject} whose \texttt{ad\_receptivity} is set
+to \texttt{none}. This value is the one the matching pipeline
+interprets as ``do not serve an ad on this turn,'' so the effect of
+the failure is silent suppression: the user receives a normal
+assistant response with no sponsored content, and an error event is
+written to the log for later inspection. A failure of the vector
+search, whether due to a Postgres outage or an empty candidate set,
+is treated identically: the matching function returns an empty list,
+the orchestrator observes that no candidates are available, and the
+response-generation call is issued without any ad in its prompt. A
+failure of Redis is handled by treating the session as if it were
+new; the current turn is extracted and matched in isolation, and the
+adaptive within-session loop is skipped for that turn only. In all
+three cases the system degrades to a strictly weaker but still
+correct version of itself, rather than surfacing an error to the
+user or blocking the response.
+
+The main-model response generation call is the one external
+dependency that cannot be silently elided, because there is no
+response without it. For this call we adopt a bounded-retry policy
+with exponential backoff and a hard deadline of a few seconds,
+beyond which the orchestrator returns a generic error message to the
+frontend and logs the incident. Ad-related state is never committed
+for a turn whose response generation failed: no impression event is
+written, no session state is updated, and no budget is debited.
+This preserves the invariant that every impression in the events
+table corresponds to an ad the user actually saw.
+
+A second class of failures, subtler than outright outages, concerns
+partial inconsistency between components. The portal, for instance,
+can mark a campaign as paused between the moment an ad was selected
+by the re-ranker and the moment the response is generated; a
+campaign's daily budget can be exhausted by a concurrent request in
+the same window; an ad's embedding can be regenerated in place after
+the candidate list was assembled. We address these races with a
+final-check pattern: immediately before the response-generation
+call, the orchestrator re-reads the selected ad's status, budget,
+and version from the database inside a single short transaction and
+aborts the injection if any invariant has been violated since
+selection. The cost of this re-read is one indexed point lookup per
+turn, which is negligible next to the model call it precedes, and
+the benefit is that the events table never contains an impression
+for an ad that was paused, out of budget, or stale at the instant
+of serving. Taken together, these mechanisms give the system a
+clear failure contract: ads may silently disappear, but the
+conversational experience does not, and the analytics layer never
+reports on events that did not faithfully happen.
