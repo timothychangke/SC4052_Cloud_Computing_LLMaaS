@@ -5,6 +5,7 @@ import { AdvertisersPage } from "../pages/AdvertisersPage";
 import { AdvertiserDetailPage } from "../pages/AdvertiserDetailPage";
 import { CampaignDetailPage } from "../pages/CampaignDetailPage";
 import { EngagementPage } from "../pages/EngagementPage";
+import logo from '../../assets/logo.png'  
 
 const GLOBAL_STYLES = `
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -62,12 +63,7 @@ export default function AnalyticsDashboard() {
         {/* Brand */}
         <div style={{ padding: "20px 16px 16px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{
-              width: 32, height: 32, borderRadius: 10,
-              background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.25)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 16, fontWeight: 700, color: "#f59e0b",
-            }}>A</div>
+          <img src={logo} alt="logo" className="sidebar-logo-img" />
             <div>
               <div style={{ fontSize: 15, fontWeight: 700, color: "#f1f5f9", letterSpacing: "-0.02em" }}>Ad LLM</div>
               <div style={{ fontSize: 10, color: "#64748b", letterSpacing: "0.06em", textTransform: "uppercase" }}>Analytics</div>
