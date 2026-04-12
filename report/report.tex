@@ -417,20 +417,7 @@
 % - Contrast with the no-match fallback: plain images.generate call with
 %   the user's original prompt, no ad metadata
  
-\subsection{Example 7: Campaign Lifecycle and Budget Exhaustion}           % NEW example
-\label{subsec:example-campaign}
-% - Scenario: a campaign with total_budget=$1000, daily_budget=$50,
-%   start_date=today, end_date=+30 days
-% - Advertiser creates the campaign via POST /portal/advertisers/{id}/campaigns
-% - Adds an ad via POST /portal/campaigns/{id}/ads — initial context is
-%   auto-generated, embedding computed, ad stored
-% - Over the day, impressions accrue; record_spend() upserts the
-%   daily_spend_log row; after 50 impressions at $1 CPM × ... the daily
-%   cap is hit → check_budget() returns False → campaign stops serving
-% - Next day: lazy reset zeroes today_spent on first touch; serving resumes
-% - Eventually total_spent ≥ total_budget → campaign auto-completes;
-%   advertiser sees status="completed" in the portal
- 
+\input{sections/illustrative_examples/analytics_examples.tex}
  
 % ============================================================
 \section{Conclusions}
