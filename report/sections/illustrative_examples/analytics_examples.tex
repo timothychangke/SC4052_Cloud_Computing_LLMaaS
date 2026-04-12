@@ -1,0 +1,243 @@
+\subsection{Example 7: Platform Dashboard --- Internal Performance Overview}
+\label{subsec:example-platform-dashboard}
+
+The first example exercises the platform-wide analytics surface that an
+internal operator consults to monitor aggregate health. Figure~\ref{fig:example-7}
+shows the dashboard rendered for a seven-day window.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{images/illustrative_example_7.png}
+    \caption{Platform Dashboard for a seven-day window, showing aggregate
+    KPIs and the top-performing ads table with per-row CTR colour coding.}
+    \label{fig:example-7}
+\end{figure}
+
+When the page mounts, the React \texttt{DashboardPage} component issues a
+single request to \texttt{GET /analytics/summary?days=7}. The backend
+\texttt{analytics\_summary} handler executes three filtered counts against
+the \texttt{events} table---one per event type within the time window---and
+derives the click-through rate as the ratio of clicks to impressions.
+Estimated revenue is computed as $\text{impressions} \times
+\overline{\text{bid\_cpm}} / 1000$, where the average CPM is taken across
+all currently active ads. A fourth query returns the ten ads with the
+highest impression counts in the window, joined to the \texttt{ads} table
+to recover product names. The response is a single \texttt{AnalyticsSummary}
+object containing the five scalar metrics and the \texttt{top\_ads} array.
+
+The frontend renders the five scalars as KPI cards and the array as a
+sortable table. The CTR column carries an inline colour indicator that
+encodes performance bands at a glance: green above three percent, amber
+between one and three percent, red below one percent. The time-range
+selector in the header re-issues the request with a different \texttt{days}
+parameter; no client-side aggregation is required.
+
+% ============================================================
+
+\subsection{Example 8: Advertiser Rollup --- Multi-Campaign Budget Health}
+\label{subsec:example-advertiser-rollup}
+
+The second example shows the per-advertiser view that a self-serve client
+consults to track spend across all of their campaigns. Figure~\ref{fig:example-8}
+shows the overview tab for Nike Inc.\ over a thirty-day window.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{images/illustrative_example_8.png}
+    \caption{Advertiser detail page for Nike Inc., showing the analytics
+    rollup, budget utilisation bar, and the per-campaign summary table.}
+    \label{fig:example-8}
+\end{figure}
+
+The \texttt{AdvertiserDetailPage} component issues two requests in parallel:
+\texttt{GET /portal/advertisers/adv\_nike} returns the advertiser record
+itself, and \texttt{GET /portal/advertisers/adv\_nike/analytics?days=30}
+returns the rollup. The latter is computed in a single SQL query that
+joins \texttt{events} to \texttt{ads} to \texttt{campaigns}, filters on
+\texttt{advertiser\_id}, and aggregates impressions, clicks, engagements,
+total budget, and total spent across every campaign owned by that
+advertiser. A nested array of per-campaign summaries is returned in the
+same payload to populate the campaigns tab.
+
+The rollup is rendered as a row of eight KPI cards followed by a budget
+utilisation bar that visualises \texttt{total\_spent} as a fraction of
+\texttt{total\_budget}. The cards distinguish between counts (campaigns,
+impressions, clicks, engagements), monetary values (budget, spend), and
+derived ratios (CTR), giving the advertiser a single view of both
+financial pacing and behavioural performance. The campaigns table below
+uses status badges---green for active, amber for paused, blue for
+completed, grey for draft---to surface lifecycle state without requiring
+the operator to drill into each campaign.
+
+% ============================================================
+
+\subsection{Example 9: Campaign Detail --- Daily Pacing and Lifecycle Control}
+\label{subsec:example-campaign-detail}
+
+The third example narrows the lens further, to a single campaign.
+Figure~\ref{fig:example-9} shows the Spring Running Campaign over a
+thirty-day window, including the dual-axis daily breakdown chart and the
+lifecycle action buttons.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{images/illustrative_example_9.png}
+    \caption{Campaign detail page for the Spring Running Campaign, showing
+    the daily impression-and-spend chart and the per-campaign KPI strip.}
+    \label{fig:example-9}
+\end{figure}
+
+The \texttt{CampaignDetailPage} component issues three requests:
+\texttt{GET /portal/campaigns/\{id\}} for the campaign record,
+\texttt{GET /portal/campaigns/\{id\}/analytics?days=30} for the metrics,
+and \texttt{GET /portal/campaigns/\{id\}/ads?limit=100} for the
+constituent ads. The analytics handler aggregates events scoped to ads
+belonging to the campaign and additionally reads from the
+\texttt{daily\_spend\_log} table, which is updated by the impression
+logger on every served ad. The result is a \texttt{daily\_breakdown}
+array containing one row per day with impressions, clicks, engagements,
+and spend.
+
+The breakdown is rendered as a Recharts dual-axis composite: bars for
+daily impressions on the left axis, a line for daily spend on the right
+axis, with a tooltip that surfaces all four metrics for the hovered day.
+A budget progress bar and a today-spend indicator at the top of the page
+provide instantaneous pacing feedback against the configured
+\texttt{daily\_budget} cap. Lifecycle actions are exposed as buttons in
+the header: \emph{Pause} issues \texttt{POST /portal/campaigns/\{id\}/pause},
+which transitions the status to \texttt{paused} and immediately removes
+the campaign's ads from the candidate pool in subsequent
+\texttt{get\_candidate\_ads} calls; \emph{Resume} performs the inverse
+transition.
+
+% ============================================================
+
+\subsection{Example 10: Engagement Analytics --- Beyond Click-Through Rate}
+\label{subsec:example-engagement-analytics}
+
+The fourth example demonstrates the engagement analytics surface, which
+operationalises the multi-dimensional engagement signal discussed in
+Section~\ref{subsec:adaptive-context}. Figure~\ref{fig:example-10} shows
+the engagement page with one ad row expanded to reveal its sub-metrics.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{images/illustrative_example_10.png}
+    \caption{Engagement analytics page showing the aggregate KPI strip,
+    the engagement timeseries, and an expanded ad row with sub-metrics
+    decomposed into engagement score, naturalness, purchase proximity,
+    and sentiment counts.}
+    \label{fig:example-10}
+\end{figure}
+
+The \texttt{EngagementPage} component issues two requests:
+\texttt{GET /analytics/engagement?days=7} returns per-ad aggregates
+computed from the engagement events logged by the LLM-based engagement
+classifier, and \texttt{GET /analytics/engagement/timeseries?days=7}
+returns a daily series of engagement counts and average scores.
+Aggregate KPIs across the displayed ads---total engagements, weighted
+average engagement score, weighted average naturalness, positive and
+negative sentiment counts---are computed client-side as engagement-weighted
+means.
+
+The page surfaces the central claim of the project's measurement
+framework: a follow-up message that engages with an advertised product
+constitutes a stronger signal of genuine interest than a click. The
+expanded ad row in Figure~\ref{fig:example-10} illustrates this concretely.
+Although Nike Pegasus 41 records a click-through rate of well under one
+percent, its engagement rate exceeds fifteen percent and its average
+naturalness score is 0.81, indicating that users frequently follow up on
+the recommendation in conversational form even when they do not click
+the tracking link. The colour coding on the sub-metrics rewards
+naturalness and engagement scores above 0.7 and flags purchase proximity
+below 0.4 as a candidate for context-level intervention.
+
+% ============================================================
+
+\subsection{Example 11: Adaptive Context Optimisation History}
+\label{subsec:example-context-optimization}
+
+The final example exposes the closed-loop mechanism that links the
+engagement metrics of Example~\ref{subsec:example-engagement-analytics}
+back to the prompt structure of Examples~\ref{subsec:example-product-research}
+through~\ref{subsec:example-multi-turn}. Each ad in the inventory carries
+a free-text \emph{presentation context guide} that is injected into the
+response-synthesis prompt whenever the ad is matched. The guide is
+versioned, and each successive version is generated by an LLM optimiser
+that reviews the engagement metrics accumulated since the previous
+version and proposes a revised guide together with a natural-language
+rationale. The result is a per-ad audit trail of how the framing of each
+product has evolved in response to behavioural feedback.
+
+The history is surfaced inside the expanded ad row of the engagement
+page and is fetched from \texttt{GET /admin/ads/\{ad\_id\}/context-history},
+backed by the \texttt{ad\_context\_history} table. Each row of that table
+carries the version number, the full \texttt{context\_text}, the
+\texttt{optimization\_reasoning} authored by the optimiser LLM, the
+\texttt{metrics\_snapshot} captured at the moment of optimisation, and a
+timestamp. Manual optimisation can be triggered from the same panel via
+\texttt{POST /admin/ads/\{ad\_id\}/optimize-context}; this call is
+guarded by a minimum-engagement threshold of five and a minimum
+inter-optimisation interval of twenty-four hours, both enforced server-side
+in \texttt{optimize\_ad\_context}.
+
+The three subfigures of Figure~\ref{fig:example-11} show the three
+successive versions of the context guide for the Nike Pegasus 41 ad.
+Version~1 (Figure~\ref{fig:example-11a}) is the initial guide generated
+at ad-ingestion time from the structured ad fields; no metrics snapshot
+is associated with it, and the reasoning field records only that the
+guide was bootstrapped from the ad metadata.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{images/illustrative_example_11a.png}
+    \caption{Context guide version~1: the initial bootstrap guide
+    generated from the ad's structured fields at ingestion time.}
+    \label{fig:example-11a}
+\end{figure}
+
+Version~2 (Figure~\ref{fig:example-11b}) was produced after 180
+impressions and 22 engagements had accumulated. The metrics snapshot
+recorded at that moment shows an average engagement score of 0.55 and
+an average purchase proximity of only 0.33. The optimiser's diagnostic
+heuristics flagged the low purchase-proximity score as the dominant
+deficiency and authored a revised guide that explicitly requires the
+assistant to connect product features to the user's stated needs rather
+than to recite generic benefits. The reasoning field records this
+diagnosis verbatim.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{images/illustrative_example_11b.png}
+    \caption{Context guide version~2: a tonal and specificity revision
+    triggered by low purchase proximity (0.33) on the version~1 sample.}
+    \label{fig:example-11b}
+\end{figure}
+
+Version~3 (Figure~\ref{fig:example-11c}) was produced after a further
+65 impressions and 16 engagements. The snapshot at that moment shows
+that purchase proximity had recovered to 0.41, but average naturalness
+had fallen to 0.52---below the 0.6 threshold that triggers the
+``soften the tone'' branch of the optimiser prompt. The revised guide
+shifts the recommended register from assertive to peer-recommendation
+style (``you might like'' rather than ``you should buy''), tightens the
+relevance criterion to suppress the ad outside running-related queries,
+and adds an explicit prohibition on price comparison. The reasoning
+field credits the dismissal-rate signal as the secondary driver of the
+relevance tightening.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{images/illustrative_example_11c.png}
+    \caption{Context guide version~3: a tone softening and relevance
+    tightening triggered by low naturalness (0.52) and elevated dismissal
+    rate on the version~2 sample.}
+    \label{fig:example-11c}
+\end{figure}
+
+The three versions together exhibit the central property of the
+adaptive context mechanism: prompt-level adaptation against a behavioural
+reward signal, with no gradient updates to the underlying model and a
+fully interpretable change log. To the best of our knowledge, no prior
+published work applies per-item LLM-driven prompt optimisation to a
+conversational advertising setting.
