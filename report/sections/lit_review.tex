@@ -1,13 +1,10 @@
 
 
 This section surveys the bodies of work that inform the design of the
-\textit{Ad LLM as a Service} platform. The review is organised by
-\emph{approach} rather than by chronology: each subsection isolates a
-distinct technical or methodological strand---digital advertising
+\textit{Ad LLM as a Service} platform, covering digital advertising
 formats, large language model capabilities, retrieval-augmented
 generation, conversational-interface monetisation, prompt engineering
-for controlled output, and engagement measurement---and positions the
-present project relative to the state of the art in that strand.
+for controlled output, and engagement measurement.
 Section~\ref{subsec:lit-summary} synthesises the findings and
 identifies the specific research gap that this project addresses.
 
@@ -16,72 +13,7 @@ identifies the specific research gap that this project addresses.
 \label{subsec:evolution-ads}
 % ------------------------------------------------------------
 
-The economic architecture of online advertising has undergone three
-major structural transitions since the first banner advertisement
-appeared on HotWired in 1994, an AT\&T creative unit that reportedly
-achieved a click-through rate exceeding 40\%~\cite{hotwired1994}.
-
-\paragraph{From display to programmatic.}
-The first generation of digital advertising was transactional and
-manual: publishers sold rectangular display regions at fixed rates per
-thousand impressions, and advertisers negotiated placements directly
-with individual sites. The introduction of ad servers---most notably
-DoubleClick in 1996---centralised delivery and measurement, but the
-buying process remained fundamentally a media-planning exercise. The
-emergence of real-time bidding (RTB) between 2007 and 2010 transformed
-this model into an auction-based marketplace in which individual
-impressions are priced algorithmically on the basis of predicted user
-value~\cite{yuan2013rtb}. Demand-side platforms (DSPs), supply-side
-platforms (SSPs), and data management platforms (DMPs) together created
-a programmatic stack that, by 2022, accounted for approximately 84\%
-of global digital display spending~\cite{emarketer2022programmatic}.
-
-\paragraph{Search advertising and intent-based targeting.}
-Google's introduction of AdWords in 2000, later renamed Google Ads,
-established a second paradigm: intent-based targeting. Rather than
-inferring user interest from page context or behavioural profiles,
-search advertising matches sponsored results directly to the user's
-expressed query. This alignment of commercial supply with declared
-demand yields conversion rates substantially higher than those of
-display advertising and has made search the single largest category of
-digital ad spending. In 2024, Google's total advertising revenue
-reached approximately \$265~billion, with the majority derived from
-search placements~\cite{statista2024google}. The economic logic is
-straightforward: a user who searches for ``best running shoes for flat
-feet'' has explicitly declared a purchase-adjacent intent that no
-amount of behavioural inference on a display network can reliably
-reconstruct.
-
-\paragraph{Social and behavioural targeting.}
-A third strand developed in parallel on social-media platforms, where
-dense self-reported demographic data and interaction graphs enabled
-highly granular audience segmentation. Facebook (now Meta), Instagram,
-and TikTok built advertising businesses on the principle that a
-user's social graph, expressed interests, and engagement patterns
-constitute a rich behavioural profile against which ads can be
-targeted even in the absence of an explicit query. This model trades
-the precision of declared intent for the breadth of passive
-behavioural signal and has proven effective for awareness and
-consideration campaigns, though it depends on third-party cookies and
-device identifiers that are now being phased out under privacy
-regulations such as the General Data Protection Regulation (GDPR) and
-Apple's App Tracking Transparency framework~\cite{gdpr2016,
-appleatt2021}.
-
-\paragraph{The move toward native formats.}
-Across all three paradigms, a persistent trend has been the migration
-from visually distinct ad units---banners, interstitials,
-pop-ups---toward formats that are structurally integrated with the
-surrounding content. Native advertising, defined as paid content that
-matches the form and function of the host medium, arose as a response
-to banner blindness and ad-blocker adoption~\cite{wojdynski2016native}.
-Sponsored articles on news sites, promoted posts on social feeds, and
-influencer endorsements on video platforms all share the property that
-the advertisement is embedded within the content stream rather than
-placed adjacent to it. The platform examined in this report extends
-this principle to its logical terminus in conversational AI: the
-sponsored recommendation is not merely placed alongside the response
-but woven into it by the language model itself.
+Digital advertising has evolved through three structural paradigms since the first banner ad in 1994~\cite{hotwired1994}: manual display buying gave way to auction-based programmatic trading via real-time bidding~\cite{yuan2013rtb, emarketer2022programmatic}; intent-based search advertising aligned sponsored results with declared user queries, generating the majority of Google's \$265~billion 2024 ad revenue~\cite{statista2024google}; and behavioural targeting on social platforms enabled granular segmentation from interaction graphs, though this model depends on third-party identifiers now being phased out under GDPR and Apple's App Tracking Transparency~\cite{gdpr2016, appleatt2021}. Across all three paradigms a persistent trend has been migration toward native formats---paid content that matches the form and function of the host medium---driven by banner blindness and ad-blocker adoption~\cite{wojdynski2016native}. The present platform extends this principle to conversational AI: the sponsored recommendation is woven into the language model's response rather than placed adjacent to it.
 
 % ------------------------------------------------------------
 \subsection{Large Language Models and Conversational AI}
@@ -89,22 +21,7 @@ but woven into it by the language model itself.
 % ------------------------------------------------------------
 
 \paragraph{The transformer architecture.}
-The architectural foundation of the present system is the transformer,
-introduced by Vaswani et al.~\cite{vaswani2017attention}. The
-transformer replaces the recurrent processing of earlier
-sequence-to-sequence models with a self-attention mechanism that
-computes pairwise relevance scores across all positions in the input
-simultaneously, enabling parallelised training and effective capture
-of long-range dependencies. This architecture has become the dominant
-substrate for language modelling: every major large language model
-(LLM) deployed as of 2025---including OpenAI's GPT
-series~\cite{brown2020gpt3, openai2023gpt4}, Anthropic's Claude
-family~\cite{anthropic2024claude3}, Google's Gemini~\cite{google2024gemini},
-and Meta's LLaMA~\cite{touvron2023llama}---is built on transformer
-variants. The progression from GPT-2's 117 million parameters to
-GPT-4's estimated hundreds of billions illustrates the scaling
-trajectory that has yielded the emergent capabilities exploited in
-this project~\cite{wei2022emergent}.
+All major LLMs deployed as of 2025---GPT-4~\cite{brown2020gpt3,openai2023gpt4}, Claude~\cite{anthropic2024claude3}, Gemini~\cite{google2024gemini}, and LLaMA~\cite{touvron2023llama}---are built on the transformer~\cite{vaswani2017attention}, whose self-attention mechanism enables parallelised training and effective capture of long-range dependencies. Scaling to hundreds of billions of parameters has produced the emergent capabilities exploited in this project~\cite{wei2022emergent}.
 
 \paragraph{Capabilities relevant to this project.}
 Four capabilities of modern LLMs are directly exercised by the Ad LLM
@@ -143,19 +60,20 @@ platform:
 \paragraph{Lightweight versus capable models.}
 A practical distinction that shapes the system architecture is the
 trade-off between model capability and inference cost. Lightweight
-models---exemplified by Anthropic's Haiku tier---offer low latency
-and low per-token cost at the expense of reduced reasoning depth.
-Capable models---exemplified by the Sonnet tier---produce higher-quality,
-more nuanced text but at greater cost and latency. The Ad LLM
-platform exploits this spectrum deliberately: context extraction, a
-classification task requiring structured output but not creative
-generation, is assigned to a Haiku-class model; response synthesis,
-which demands natural integration of a product mention into a helpful
-answer, is assigned to a Sonnet-class
-model~\cite{anthropic2024claude3}. This two-tier strategy is
-consistent with the broader industry practice of routing sub-tasks to
-the smallest model that achieves acceptable quality, thereby
-minimising aggregate inference cost~\cite{chen2023frugalgpt}.
+models---such as small-parameter variants offered by providers
+including OpenAI, Google, and Meta---offer low latency and low
+per-token cost at the expense of reduced reasoning depth. Capable
+models---larger frontier variants from the same providers---produce
+higher-quality, more nuanced text but at greater cost and latency.
+The Ad LLM platform exploits this spectrum deliberately: context
+extraction, a classification task requiring structured output but not
+creative generation, is assigned to a lightweight model; response
+synthesis, which demands natural integration of a product mention
+into a helpful answer, is assigned to a more capable
+model. This two-tier strategy is consistent with the broader industry
+practice of routing sub-tasks to the smallest model that achieves
+acceptable quality, thereby minimising aggregate inference
+cost~\cite{chen2023frugalgpt}.
 
 % ------------------------------------------------------------
 \subsection{Retrieval-Augmented Generation (RAG)}
@@ -163,20 +81,7 @@ minimising aggregate inference cost~\cite{chen2023frugalgpt}.
 % ------------------------------------------------------------
 
 \paragraph{The RAG paradigm.}
-Retrieval-augmented generation, formalised by Lewis et
-al.~\cite{lewis2020rag}, addresses a fundamental limitation of
-parametric language models: their knowledge is frozen at training time
-and cannot be updated or extended without retraining. The RAG
-architecture augments the generative model with a non-parametric
-memory---a corpus of documents indexed for efficient retrieval---so
-that, at inference time, the model conditions its output on both the
-user query and the most relevant retrieved passages. Lewis et al.\
-demonstrated that this combination of a pre-trained seq2seq
-transformer (BART) with a dense vector index of Wikipedia, accessed
-via a neural retriever (Dense Passage Retriever,
-DPR)~\cite{karpukhin2020dpr}, achieved state-of-the-art results on
-open-domain question answering benchmarks and generated more factual,
-specific language than parametric-only baselines.
+Retrieval-augmented generation (RAG), formalised by Lewis et al.~\cite{lewis2020rag}, augments a parametric language model with a non-parametric document index so that, at inference time, the model conditions its output on both the user query and the most relevant retrieved passages, producing more factual and specific language than parametric-only baselines.
 
 \paragraph{Vector embeddings and semantic similarity.}
 The retrieval component of a RAG pipeline depends on dense vector
@@ -249,7 +154,14 @@ tag~\cite{google2023sge}. By 2025, Google had extended these
 placements into AI Mode, a fully conversational search interface
 powered by Gemini~2.0, and reported that ads drawn from existing
 Search and Shopping campaigns were being served within AI-generated
-responses~\cite{google2025aimode}.
+responses~\cite{google2025aimode}. OpenAI followed in early 2026,
+announcing a test of sponsored content within ChatGPT for Free and
+Go-tier users~\cite{openai2026ads}. Ads are visually separated from
+the organic answer and labelled as sponsored; they are withheld from
+minor users and excluded from sensitive topic areas including health,
+mental health, and politics. OpenAI also committed that ad content
+does not influence the underlying model response, and that
+conversation data is kept private from advertisers.
 
 These deployments share a common limitation from the perspective of
 the present project: they append or interleave conventional ad units
@@ -360,24 +272,7 @@ fidelity, though compliance is not absolute: adversarial or ambiguous
 inputs can cause the model to deviate from instructions. The prompt
 design for the Ad LLM platform therefore includes explicit rejection
 logic (``If the product is not relevant to the conversation, ignore it
-entirely'') and is validated against an evaluation set of 20--30
-scenarios covering both successful integration and correct rejection.
-
-\paragraph{Balancing helpfulness with ad integration naturalness.}
-A distinctive prompt-engineering challenge in this project is the
-dual-objective nature of the generation task: the response must
-simultaneously be \emph{helpful} (answering the user's question
-accurately and completely) and \emph{commercially effective} (weaving
-a product mention into the answer in a way that feels like an informed
-suggestion rather than an insertion). These objectives are not
-inherently conflicting---a relevant product recommendation \emph{is}
-helpful---but they become so when the matched advertisement is only
-tangentially related to the user's query. The prompt must therefore
-encode a threshold: the model should integrate the product only when
-doing so genuinely enhances the response, and should produce a
-purely organic answer otherwise. Achieving consistent behaviour
-across diverse conversation types requires iterative prompt refinement
-guided by systematic evaluation.
+entirely'').
 
 \paragraph{LLM-as-judge for automated quality evaluation.}
 Manual evaluation of generated responses does not scale. The
@@ -394,21 +289,6 @@ naturalness of ad integration, disclosure accuracy, and ad relevance,
 enabling automated detection of quality regressions without requiring
 continuous human review.
 
-Beyond sampled offline monitoring, the Ad LLM platform extends the
-LLM-as-judge paradigm into an online measurement role: every follow-up
-turn after an ad impression is passed to a judge model that returns a
-structured multi-dimensional assessment comprising an engagement
-score, an ad-naturalness score, an estimated purchase-proximity score,
-a sentiment polarity, and a categorical engagement type (e.g.,
-\emph{product inquiry}, \emph{comparison}, \emph{price inquiry},
-\emph{purchase intent}, \emph{dismissal}). This contrasts with most
-prior LLM-as-judge deployments, which treat the judge as an offline
-evaluator of a held-out test set. Using the judge as an
-\emph{in-the-loop} instrument raises new considerations---judge
-consistency across runs, the cost of an additional LLM call per
-engaged turn, and the risk of judge drift as the underlying model is
-updated---that are under-explored in the current literature and which
-this project confronts directly.
 % ------------------------------------------------------------
 \subsection{User Engagement Metrics in Conversational Systems}
 \label{subsec:engagement-metrics}
@@ -428,26 +308,6 @@ response is a continuous text stream, the concept of a discrete
 ``impression'' is less well defined, and a ``click'' on an embedded
 link may not capture the full spectrum of user engagement with the
 recommended product.
-
-\paragraph{A multi-dimensional engagement vector.}
-In practice the Ad LLM platform decomposes ``engagement'' into a
-vector of six signals produced by a judge model on each post-ad
-follow-up turn: (a)~a binary engaged/not-engaged flag;
-(b)~an \emph{engagement type} drawn from a fixed taxonomy (product
-inquiry, comparison, price inquiry, purchase intent, feature question,
-positive reaction, negative reaction, dismissal); (c)~a continuous
-engagement score in $[0,1]$; (d)~an ad-naturalness score in $[0,1]$
-estimating how organic the placement felt from the user's reaction;
-(e)~a purchase-proximity score in $[0,1]$ approximating how close the
-user appears to a buying decision; and (f)~a sentiment polarity toward
-the ad. This decomposition is more informative than a single scalar
-engagement value because it separates \emph{whether} the user engaged
-from \emph{how} they engaged and \emph{how the ad was received},
-enabling the downstream optimisation described in
-Section~\ref{subsec:adaptive-context} below. It also aligns with the
-direction advocated by Mehri and Esk{\'e}nazi~\cite{mehri2020unsupervised},
-who argue that dialogue quality is inherently multi-faceted and
-resists collapse to a single number.
 
 \paragraph{Why conversational engagement is a stronger signal.}
 The fundamental advantage of conversational engagement metrics over
@@ -502,46 +362,6 @@ against a measurable reward signal---essentially applying the
 reinforcement-learning-from-feedback idea at the prompt level rather
 than the weight level.
 
-\paragraph{Per-item context as an optimisable unit.}
-The Ad LLM platform applies this principle at the granularity of
-individual ads. Each ad in the inventory carries, in addition to its
-creative text and targeting metadata, a free-text ``presentation
-context guide'' that is injected into the response-synthesis prompt
-whenever that ad is matched. This guide specifies how the product
-should be framed: tone, recommended angles, features to emphasise,
-situations in which to avoid mentioning it, and comparisons to avoid.
-It is distinct from the creative text in that it constrains the
-\emph{model's rendering} of the product rather than the copy shown to
-the user. The context guide is versioned: each update is persisted
-alongside the engagement metrics snapshot that justified it, yielding
-an auditable history of how the framing of each ad has evolved.
-The initial version of each context guide is itself generated 
-automatically when the ad is first created: a bootstrap LLM call 
-inspects the ad's creative text, targeting metadata, and (where available) 
-scraped product-page content, and drafts a first-pass guide, so that the 
-optimisation loop begins from a reasonable starting point rather than from 
-an empty string.
-
-\paragraph{Closing the loop with engagement feedback.}
-The multi-dimensional engagement vector introduced above serves as the
-reward signal for an automatic optimiser. At a configurable cadence,
-and subject to minimum-sample and cooldown guards, a separate LLM call
-reviews the recent engagement history for an ad---aggregate
-engagement rate, average engagement score, average naturalness score,
-average purchase proximity, positive and negative sentiment counts,
-dismissal counts, and a sample of raw follow-up messages---together
-with the current context guide, and proposes a revised guide with an
-accompanying natural-language rationale. The optimiser prompt encodes
-diagnostic heuristics such as ``if naturalness is low, soften the
-tone'' and ``if dismissals are high, tighten the relevance criteria.''
-The resulting system implements a closed loop analogous in spirit to
-bandit-style ad optimisation~\cite{li2010contextual}, but operating
-over natural-language prompt fragments rather than numeric bid or
-placement parameters, and using an LLM both to interpret the feedback
-and to author the next candidate. To the best of our knowledge, no
-prior published work applies per-item LLM-driven prompt optimisation
-to a conversational advertising setting.
-
 \paragraph{Relationship to reinforcement learning from human feedback.}
 RLHF~\cite{ouyang2022instructgpt} trains model weights against a
 reward model learned from human preference data. The adaptive context
@@ -561,88 +381,14 @@ is a third-party API whose weights are inaccessible.
 \label{subsec:image-placement}
 % ------------------------------------------------------------
 
-\paragraph{Text-to-image and image-editing models.}
-Recent text-to-image systems---DALL-E~3~\cite{betker2023dalle3}, Stable
-Diffusion~\cite{rombach2022ldm}, and Imagen~\cite{saharia2022imagen}---produce
-photorealistic images from natural-language prompts and have become
-standard components of generative chat interfaces. A parallel line of
-work on image editing and subject-driven generation, including
-DreamBooth~\cite{ruiz2023dreambooth} and InstructPix2Pix~\cite{brooks2023instructpix2pix},
-enables a specific visual subject to be inserted or preserved across
-generations by conditioning on one or more reference images in
-addition to the text prompt. These capabilities are now exposed as
-image-editing endpoints in commercial APIs, allowing a reference image
-to act as a visual anchor for the generated scene.
-
-\paragraph{Product placement as a creative convention.}
-In traditional media---film, television, and more recently influencer
-video---product placement is a long-established advertising format in
-which a branded item is integrated diegetically into the scene rather
-than presented as an interruption~\cite{balasubramanian2006productplacement}.
-Empirical studies have shown that well-executed placement can achieve
-higher recall and more favourable brand attitudes than conventional
-spot advertising, provided the placement feels natural to the
-narrative context~\cite{vanreijmersdal2009placement}. Until recently,
-this format required human creative direction and physical staging;
-generative image models now make algorithmic placement technically
-feasible at per-request granularity.
-
-\paragraph{Extending the Ad LLM thesis to the visual modality.}
-When a user issues an image-generation request through the Ad LLM
-platform, the same context-extraction and RAG-based ad-matching
-pipeline that handles chat messages is invoked to select a relevant
-product. An auxiliary LLM call then rewrites the user's original image
-prompt so that the matched product appears organically in the scene
-(e.g., ``on a shelf'', ``held by a subject'', ``worn by a runner''),
-preserving the user's original creative intent while adding the
-product as a diegetic element. If the ad inventory includes a
-reference photograph of the product, the rewritten prompt is passed to
-an image-editing endpoint together with the reference image, so that
-the generated scene is visually grounded in the actual product rather
-than in the model's prior over product names. This directly mirrors
-the text pipeline's ``instruct the generative model to weave in the
-ad'' design philosophy and extends it to pixels, producing what is, to
-our knowledge, the first described pipeline for \emph{RAG-matched,
-sponsored product placement in user-requested AI-generated imagery}.
-
-\paragraph{Open questions specific to the visual modality.}
-Placing real branded products in generated images raises ethical and
-legal questions that do not arise in the text case. Visual disclosure
-is harder than textual disclosure: a \texttt{[Sponsored]} tag can be
-prepended to a response caption, but the image itself carries no
-intrinsic marker that the product within it is a paid placement.
-Intellectual-property considerations are also sharper, since a
-generated image of a branded product may implicate trademark and
-trade-dress rights that a textual mention does not. These issues are
-acknowledged as open and are discussed further in the ethical
-considerations of Section~\ref{subsec:problem-ethics}; the literature
-on regulatory responses to AI-generated visual content is still
-nascent and, at the time of writing, does not yet provide clear
-guidance on sponsored generative imagery.
+Recent text-to-image systems---DALL-E~3~\cite{betker2023dalle3}, Stable Diffusion~\cite{rombach2022ldm}, and Imagen~\cite{saharia2022imagen}---together with subject-driven image-editing models such as DreamBooth~\cite{ruiz2023dreambooth} and InstructPix2Pix~\cite{brooks2023instructpix2pix}, make it technically feasible to insert a specific branded product into a user-requested generated scene at per-request granularity. Product placement---integrating a branded item naturally into a scene rather than as an interruption---is a well-studied advertising convention with demonstrated recall and brand-attitude advantages over spot advertising~\cite{balasubramanian2006productplacement, vanreijmersdal2009placement}. The Ad LLM platform extends its text pipeline to this modality by applying the same RAG-based ad-matching to image requests and rewriting the user's prompt to include the matched product organically. This raises open disclosure and intellectual-property questions that the nascent regulatory literature does not yet resolve.
 
 % ------------------------------------------------------------
 \subsection{Summary and Research Gap}
 \label{subsec:lit-summary}
 % ------------------------------------------------------------
 
-The preceding subsections have surveyed eight bodies of work that
-converge on the problem addressed by this project: (i)~the evolution
-of digital advertising toward native, content-integrated formats;
-(ii)~the capabilities of transformer-based LLMs for instruction
-following, structured output, and tone-adapted generation; (iii)~the
-RAG paradigm for grounding language-model output in retrieved external
-context; (iv)~the emerging practice of embedding advertising in
-conversational AI interfaces, together with the ethical and regulatory
-constraints that govern disclosure; (v)~prompt engineering techniques
-for controlled generation and the LLM-as-judge paradigm for both
-offline and in-the-loop quality evaluation; (vi)~engagement metrics
-that go beyond click-through to capture genuine user attention in
-dialogue systems, decomposed into a multi-dimensional signal vector;
-(vii)~automatic and data-driven prompt optimisation as a lightweight
-alternative to parameter-level fine-tuning; and (viii)~generative
-image models and the long-standing advertising convention of product
-placement, which together make algorithmic visual ad integration
-newly feasible.
+The preceding subsections have surveyed eight converging bodies of work: the evolution of digital advertising toward native formats; transformer-based LLM capabilities; the RAG paradigm; conversational advertising deployments and their disclosure obligations; prompt engineering and LLM-as-judge evaluation; engagement metrics beyond click-through; data-driven prompt optimisation; and generative image models enabling algorithmic product placement.
 
 The gap that this project addresses lies at the intersection of these
 strands. Existing industry deployments of conversational
