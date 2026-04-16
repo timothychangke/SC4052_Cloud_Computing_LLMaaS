@@ -23,8 +23,8 @@ from app.models.schemas import (
     Ad, ContextObject, Intent, AdReceptivity, ResponseObject, Turn,
     EngagementMetrics, EngagementType,
 )
-
-_CHAT_MODEL  = "llama-3.3-70b-versatile"
+_CONTEXT_MODEL = "openai/gpt-oss-20b"
+_CHAT_MODEL  = "openai/gpt-oss-120b"
 _EMBED_MODEL = "all-mpnet-base-v2"
 
 _groq_client: AsyncGroq | None = None
@@ -89,7 +89,7 @@ Conversation history:
 Latest user message: {message}"""
 
     resp = await _get_groq().chat.completions.create(
-        model=_CHAT_MODEL,
+        model=_CONTEXT_MODEL,
         max_tokens=512,
         messages=[{"role": "user", "content": prompt}],
     )

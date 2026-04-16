@@ -1,0 +1,70 @@
+The third example demonstrates the pipeline's relevance gate: when no
+candidate ad crosses the minimum similarity threshold, the system returns a
+purely helpful response with no sponsored content.
+Figure~\ref{fig:example-3} shows the result for a health-and-symptoms query
+--- an inherently non-commercial topic for which no ad in the inventory is
+relevant.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{images/illustrative_example_2.png}
+    \caption{Chat response to a health-symptoms query.  No sponsored content
+    appears because all candidate ads fell below the similarity threshold.}
+    \label{fig:example-3}
+\end{figure}
+
+\subsubsection{Stage 1: Context Extraction}
+\label{subsubsec:example3-context}
+
+The context-extraction module classifies the query as a general information
+request with no commercial intent:
+
+\begin{lstlisting}[style=jsonstyle, caption={Context extraction output for the
+health query.}, label={lst:example3-context}]
+{
+  "intent":          "general_question",
+  "ad_receptivity":  "low",
+  "purchase_signal": 0.00,
+  "topics":          ["health", "symptoms", "medical"],
+  "entities":        []
+}
+\end{lstlisting}
+
+\noindent
+A \texttt{purchase\_signal} of~0.00 and \texttt{ad\_receptivity} of
+\texttt{low} signal that the user is not in a buying mindset.  Unlike
+\texttt{none} (which would skip retrieval entirely), \texttt{low} still
+permits a vector search --- but the re-ranker applies no purchase-proximity
+boost, and the similarity threshold is enforced strictly.
+
+\subsubsection{Stage 2: Vector Search and Re-ranking}
+\label{subsubsec:example3-retrieval}
+
+The topics \emph{``health symptoms medical''} are encoded and searched against
+the ad inventory.  Three candidates are returned, none of which are
+thematically related to medical queries:
+
+\begin{lstlisting}[style=jsonstyle, caption={All three vector-search candidates,
+all below the 0.35 similarity threshold.}, label={lst:example3-retrieval}]
+[
+  { "product_name": "Dyson V15 Detect",     "similarity": 0.2943 },
+  { "product_name": "Nike Pegasus 41",      "similarity": 0.2307 },
+  { "product_name": "Allbirds Tree Runners","similarity": 0.1782 }
+]
+\end{lstlisting}
+
+\noindent
+Every score falls below the minimum threshold of~0.35.  The re-ranker
+therefore discards all three candidates and forwards an empty ad list to
+the synthesis stage.
+
+\subsubsection{Stage 3: Response Generation (No Sponsored Content)}
+\label{subsubsec:example3-response}
+
+With an empty ad list, the orchestrator assembles a system prompt that
+contains no \texttt{<sponsored\_context>} block.  The LLM produces a
+straightforward medical-information response --- identifying potential causes
+(viral or bacterial infection, impetigo, hand-foot-and-mouth disease) and
+recommending a doctor consultation --- without any product mention or
+disclosure label.  No impression event is written and no campaign spend is
+recorded for this turn.

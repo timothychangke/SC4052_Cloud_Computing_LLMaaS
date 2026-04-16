@@ -1,0 +1,63 @@
+The second example demonstrates the pipeline's ethical safeguard: when the
+context-extraction module identifies a conversation as emotionally sensitive,
+the system suppresses ad delivery entirely and returns a purely supportive
+response.  This gate operates independently of the ad inventory --- even if
+highly relevant ads existed, they would not be shown.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{images/illustrative_example_2.png}
+    \caption{Chat response to a sensitive mental-health query.  No sponsored
+    content appears; the assistant responds with empathetic, helpful guidance
+    entirely free of product mentions.}
+    \label{fig:example-2}
+\end{figure}
+
+\subsubsection{Stage 1: Context Extraction and Sensitivity Detection}
+\label{subsubsec:example2-context}
+
+The user opens a conversation about personal stress and mental wellbeing.
+The context extractor returns:
+
+\begin{lstlisting}[style=jsonstyle, caption={Context extraction output for a
+sensitive mental-health query.}, label={lst:example2-context}]
+{
+  "intent":          "general_question",
+  "ad_receptivity":  "low",
+  "purchase_signal": 0.00,
+  "topics":          ["mental health", "stress", "anxiety"],
+  "entities":        []
+}
+\end{lstlisting}
+
+\noindent
+Two signals jointly trigger suppression.  First, \texttt{purchase\_signal}
+is~0.00, indicating no commercial intent whatsoever.  Second, the topics
+array contains members of the hard-coded sensitivity list (\texttt{mental
+health}, \texttt{anxiety}, \texttt{grief}, \texttt{financial distress},
+and related terms).  The orchestrator evaluates both conditions before
+dispatching a retrieval request: if either \texttt{ad\_receptivity} is
+\texttt{low} \emph{and} the topic set intersects the sensitivity list, the
+ad-matching stage is skipped.
+
+\subsubsection{Stage 2: Ad Matching Skipped}
+\label{subsubsec:example2-skip}
+
+Because the sensitivity gate fires, the orchestrator forwards an empty ad
+list directly to the synthesis stage without issuing any embedding or
+vector-search call.  No candidates are scored, no budget gate is evaluated,
+and no \texttt{<sponsored\_context>} block is assembled.  This is a stricter
+outcome than the threshold-rejection path seen in
+Example~\ref{subsec:example-irrelevant}: there, the pipeline searched but
+found no qualifying ads; here, it does not search at all.
+
+\subsubsection{Stage 3: Response Generation}
+\label{subsubsec:example2-response}
+
+The system prompt passed to the LLM contains only the conversational
+instruction set --- no sponsored context, no tracking URL, no disclosure
+obligation.  The model responds with empathetic, helpful guidance
+appropriate to a mental-health topic, entirely free of product mentions.
+No impression event is written and no campaign spend is recorded for this
+turn.  From the user's perspective the interaction is indistinguishable from
+a standard ad-free assistant; the suppression is invisible by design.
