@@ -1,0 +1,272 @@
+% ============================================================
+\section{Conclusions}
+\label{sec:conclusions}
+% ============================================================
+
+This report has presented the design, implementation, and evaluation of
+\textit{Ad LLM as a Service}, a working platform that delivers
+sponsored product recommendations natively inside the responses of a
+conversational AI. The platform was motivated by a structural mismatch
+between the inventory of advertising formats inherited from the visual
+web and the linear, multi-turn nature of chat-based interfaces, and
+was scoped to demonstrate that this mismatch can be resolved without
+either appending foreign ad blocks to the conversation or retreating
+to keyword-style auctions over the most recent user message. The
+sections below summarise what was built, partition the work between
+the two human workstreams, state the limitations of the current
+implementation, and sketch the natural successors to the system as
+delivered.
+
+% ------------------------------------------------------------
+\subsection{Summary of Contributions}
+\label{subsec:summary-contributions}
+% ------------------------------------------------------------
+
+The platform contributes a set of components that are, individually,
+adaptations of known techniques, but whose joint realisation inside a
+single end-to-end system has not, to the best of our knowledge, been
+published before. We summarise the contributions as follows.
+
+\begin{enumerate}[label=(\roman*), leftmargin=2.5em]
+  \item \textbf{An end-to-end architecture for LLM-native
+    conversational advertising, spanning both text and image
+    modalities.} A single FastAPI orchestrator serves a chat pipeline
+    that produces ad-augmented textual replies and an image-generation
+    pipeline that produces ad-augmented imagery, both reusing the
+    same context extraction and matching infrastructure.
+
+  \item \textbf{A specialised RAG pipeline for ad matching.} Semantic
+    retrieval over a \texttt{pgvector} index is combined with a
+    business-rule re-ranker that enforces campaign eligibility, daily
+    and total budget caps, per-session frequency capping, and a
+    weighted composite score in which semantic similarity, bid price,
+    and purchase signal are interpretable and auditable.
+
+  \item \textbf{Prompt-engineered natural ad integration with
+    mandatory disclosure.} Ad injection is realised as
+    prompt-level conditioning of the response-synthesis model rather
+    than as post-hoc text rewriting, and every commercial mention is
+    accompanied by the literal \texttt{[Sponsored]} marker required by
+    Federal Trade Commission guidance.
+
+  \item \textbf{Multi-dimensional engagement measurement via an
+    in-the-loop LLM judge.} A dedicated judge call returns, per
+    follow-up turn, a six-field engagement vector comprising an
+    engagement-type label, a continuous engagement score, a
+    naturalness score, an estimated purchase-proximity, a sentiment
+    polarity, and a topic-match flag, which jointly form a
+    higher-fidelity signal than any single click-or-not-click
+    measurement.
+
+  \item \textbf{Closed-loop adaptive optimisation of per-ad
+    presentation context.} Each advertisement carries a versioned
+    presentation-guidance document that is rewritten by an optimiser
+    LLM in response to aggregated engagement metrics, under
+    minimum-engagement and minimum-interval guards, with a
+    natural-language rationale and a metrics snapshot persisted for
+    every revision.
+
+  \item \textbf{Organic product placement in generated imagery.} The
+    image pipeline rewrites the user's prompt to place the matched
+    product diegetically into the requested scene and, when the
+    advertisement carries a reference photograph, dispatches the
+    rewritten prompt to the image-edit endpoint so that the rendered
+    product is visually grounded in the real article rather than
+    reconstructed from a textual prior.
+
+  \item \textbf{A full advertiser portal with campaign, budget, and
+    ad management.} The portal exposes CRUD operations over
+    advertisers, campaigns, and ads under a strict URL hierarchy,
+    enforces a \texttt{draft}/\texttt{active}/\texttt{paused}/\texttt{completed}
+    campaign lifecycle with auto-completion on budget exhaustion, and
+    accelerates ad creation via a URL-based extraction flow that
+    scrapes a product page and pre-fills the ad fields as an editable
+    draft.
+
+  \item \textbf{Ethical safeguards realised as structural invariants
+    rather than soft filters.} Sensitivity-aware gating at the
+    context-extraction stage short-circuits the matching pipeline
+    before any retrieval or budget accounting work is performed, and
+    this decision cannot be overridden by bid, similarity, or budget
+    on any downstream branch.
+\end{enumerate}
+
+% ------------------------------------------------------------
+\subsection{Workstream Contributions}
+\label{subsec:workstream-contributions}
+% ------------------------------------------------------------
+
+The project was delivered by two human workstreams that developed in
+parallel against the frozen interface contract of
+Section~\ref{subsec:interface-contracts}. The \textbf{backend and
+infrastructure} workstream owned the FastAPI orchestrator, the
+session manager, the PostgreSQL schema (including the \texttt{ads},
+\texttt{campaigns}, \texttt{daily\_spend\_log}, \texttt{events}, and
+\texttt{ad\_context\_history} tables), the ad matching pipeline with
+its budget-gated eligibility check, the click-tracking and
+spend-accounting transaction, the platform and advertiser analytics
+APIs, the React dashboards, the advertiser portal including the
+campaign lifecycle endpoints, the image-generation route, and the
+frontend integration for both the chat and image surfaces. The
+\textbf{AI and LLM} workstream owned the context extractor and its
+Pydantic schema, the embedding pipeline on both the ingestion and
+query sides, the response-synthesis prompt and its context-guide
+injection, the engagement judge, the initial-context generator invoked
+at ad ingestion time, the periodic context optimiser, the placement
+prompt rewriter used in the image pipeline, the URL-based product
+extraction flow, and the LLM-as-judge offline evaluator used in the
+quality-assurance framework. Each workstream was able to exercise its
+own invariants against a typed stub of the other, so that system
+integration was a short merge step rather than a protracted debugging
+phase.
+
+% ------------------------------------------------------------
+\subsection{Limitations}
+\label{subsec:limitations}
+% ------------------------------------------------------------
+
+The platform as delivered is a minimum viable product and carries a
+number of limitations that are worth stating explicitly. The chat and
+image pipelines depend on third-party LLM and image-generation APIs,
+which subjects the serving path to the latency, cost, and availability
+envelope of those providers rather than to a self-hosted baseline.
+The re-ranking weights $(0.5, 0.3, 0.2)$ are hand-tuned
+hyperparameters rather than coefficients learned from click or
+engagement data, and although they are explicable at the level of the
+design objective, they are not optimal in any formal sense. The
+engagement vector on which the feedback loop operates is produced by
+a single LLM judge call per follow-up turn and is therefore subject
+to drift as the underlying judge model is revised by its provider;
+we do not currently run a second judge in parallel or calibrate the
+score against held-out human labels. The adaptive context optimiser
+treats each advertisement as a single target and produces one guide
+per ad, which precludes segment-conditional presentation strategies
+in which the recommended register or level of specificity depends on
+the user's inferred context. The image-generation surface lacks any
+automated visual-disclosure mechanism beyond the ad-metadata payload
+returned alongside the rendered image, and the trademark and
+trade-dress implications of rendering a reference-grounded product
+into a user-specified scene have not been formally assessed. The ad
+inventory used during development was small, so claims about
+inventory-scale behaviour beyond the order-of-magnitude targets of
+Section~\ref{subsubsec:ad-inventory-store} rest on analytical rather
+than empirical evidence. Finally, the platform has not been evaluated
+with real advertiser traffic or under an A/B testing protocol, and
+the engagement-rate claims quoted elsewhere in the report are based
+on the internal regression set rather than on a production user base.
+
+% ------------------------------------------------------------
+\subsection{Future Work}
+\label{subsec:future-work}
+% ------------------------------------------------------------
+
+The limitations above map directly onto a roadmap of successor
+problems. We group them by the component they extend.
+
+\begin{itemize}[leftmargin=1.8em]
+  \item \textbf{Attention and learned ranking.} Extend the engagement
+    judge with a dwell-time and read-through estimator, and train a
+    predicted-CTR model on the accumulated click and engagement log to
+    replace the hand-tuned re-ranking weights with learned
+    coefficients under appropriate exploration.
+
+  \item \textbf{Segment-conditional ad context.} Support multiple
+    presentation guides per advertisement, selected at synthesis time
+    by the extracted context object, so that the register and
+    specificity of a sponsored mention can adapt to the user's
+    inferred state without requiring a separate creative.
+
+  \item \textbf{Judge ensembling and calibration.} Run a second,
+    architecturally distinct LLM judge in parallel on a sampled
+    subset of turns, periodically reconcile the two scores against a
+    small human-labelled set, and treat the agreement rate itself as
+    a monitored metric.
+
+  \item \textbf{Visual disclosure for generated imagery.} Introduce a
+    watermark, caption-level tagging, or provenance-metadata channel
+    on images that carry a sponsored product, so that the visual
+    surface acquires the analogue of the \texttt{[Sponsored]} marker
+    that the text surface already enforces.
+
+  \item \textbf{Principled evaluation under within-session
+    dependency.} Replace the current regression-set methodology with
+    a bandit-style evaluation that respects the observation of
+    Section~\ref{subsec:qa-framework} that serving decisions on one
+    turn shape context on subsequent turns within the same session,
+    and thereby violate the independence assumptions that
+    conventional A/B tests rely on.
+
+  \item \textbf{Tone adaptation.} Make the register of the sponsored
+    mention responsive to the surrounding conversational register, so
+    that a casual chat thread does not suddenly receive a
+    brochure-style recommendation and a technical thread does not
+    receive a colloquial one.
+
+  \item \textbf{Brand safety and content filtering.} Add an explicit
+    topic classifier and blocklist upstream of response synthesis,
+    complementing the existing sensitivity gate with an
+    advertiser-configurable brand-safety layer.
+
+  \item \textbf{Commercial integration.} Connect the campaign spend
+    ledger to a billing and invoicing subsystem so that the
+    platform's accounting of charged impressions becomes the
+    authoritative input to advertiser billing rather than an internal
+    diagnostic.
+
+  \item \textbf{Domain-specific context extraction.} Fine-tune the
+    context extractor on domain-specific dialogue data so that the
+    Haiku-tier call can be replaced with a smaller, cheaper, and
+    more targeted model without surrendering schema fidelity or
+    receptivity-gate sensitivity.
+\end{itemize}
+
+% ------------------------------------------------------------
+\subsection{Reflections}
+\label{subsec:reflections}
+% ------------------------------------------------------------
+
+Three observations from the build process are worth recording
+explicitly, not as project artefacts but as notes for future work of
+a similar shape.
+
+The first concerns the value of a frozen interface contract at the
+start of a two-workstream project. The four function signatures and
+four dataclasses of Section~\ref{subsec:interface-contracts} were
+agreed before any production code existed, and every subsequent
+design decision that might otherwise have crossed the seam between
+workstreams was instead resolved inside one of the two boundaries.
+The cost of this discipline was a single unrushed session in Week~1;
+the benefit was that system integration never became a blocking
+activity.
+
+The second concerns prompt engineering. The response-synthesis prompt,
+the engagement-judge prompt, and the context-optimiser prompt each
+passed through a double-digit number of revisions during development,
+and the revisions that produced the largest behavioural change were,
+without exception, those that tightened a constraint rather than
+those that added new instructions. The prompt that yielded the most
+natural ad integration was the one that specified what the model was
+permitted to omit, not the one that specified what it was required to
+say.
+
+The third concerns the tension between user experience and
+monetisation that animates the entire problem. It is tempting, under
+deadline pressure, to treat this tension as a slider and to argue
+about where to set it. The present project took the opposite stance:
+the helpfulness of the response was treated as a precondition that
+every ad-related component had to respect, not as a quantity that
+could be traded off against commercial yield. Every ethical
+safeguard, from the sensitivity gate in the context extractor to the
+final-check pattern before response synthesis, is a structural
+encoding of this stance, and the fact that each could be implemented
+without sacrificing the interactive latency budget suggests that the
+tension was less fundamental than it first appeared.
+
+Taken together, the contributions, limitations, and successor
+problems above define a platform that is, we believe, a faithful
+instantiation of the thesis with which this report began: that
+advertising in conversational AI is not a porting problem but a
+format problem, and that the format it calls for is one in which the
+advertisement is written by the same model that writes the answer,
+within the same conversation, under the same constraints of
+helpfulness, disclosure, and care.
