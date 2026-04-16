@@ -417,39 +417,19 @@
  
 \subsection{Example 1: Product Research Conversation}
 \label{subsec:example-product-research}
-% - Scenario: "What are the best running shoes for marathon training?"
-% - Walk through: context extraction → query embedding → vector search →
-%   re-ranking WITH budget gate → prompt assembly showing BOTH the
-%   <sponsored_context> block AND the current ad_context presentation
-%   guide → generated response → impression logged → campaign spend
-%   recorded → daily_spend_log upsert                                   % REVISED
-% - Show the actual JSON payloads at each step
+\input{sections/illustrative_examples/example1.tex}
  
 \subsection{Example 2: Sensitive Conversation (Ad Suppression)}
 \label{subsec:example-sensitive}
-% - Scenario: financial distress or emotional difficulty
-% - ad_receptivity = "none" → pipeline skips ad matching entirely
-% - Response generated without any <sponsored_context> block
-% - Demonstrates the ethical safeguard
+\input{sections/illustrative_examples/example2.tex}
  
 \subsection{Example 3: Irrelevant Ad Rejection}
 \label{subsec:example-irrelevant}
-% - Scenario: user asks about cooking; only running-shoe ads are available
-% - Vector search returns low-similarity candidates
-% - Prompt instructs the LLM to ignore irrelevant ads
-% - Generated response is purely helpful with no product mention
+\input{sections/illustrative_examples/example3.tex}
  
 \subsection{Example 4: Multi-Dimensional Engagement Follow-Up}            % REVISED
 \label{subsec:example-engagement}
-% - Scenario: after seeing a Nike Pegasus 41 ad, user asks
-%   "How does it compare to the Asics Nimbus?"
-% - Engagement judge returns:
-%     engaged=true, engagement_type=comparison, engagement_score=0.82,
-%     ad_naturalness_score=0.78, purchase_proximity=0.55,
-%     sentiment_toward_ad=positive, follow_up_topic_match=true
-% - Event logged with full JSON payload in events.payload
-% - Analytics page: score/naturalness/purchase-proximity cards update;
-%   engagement-type pie chart shows a new "comparison" slice
+\input{sections/illustrative_examples/example4.tex}
  
 \subsection{Example 5: Adaptive Context Optimisation Loop}                % NEW example
 \label{subsec:example-optimization}
@@ -464,17 +444,9 @@
 % - New context persisted at version 3; metrics snapshot written to
 %   ad_context_history; next response-synthesis call uses the new guide
  
-\subsection{Example 6: Image Generation with Product Placement}            % NEW example
+\subsection{Example 6: Image Generation with Product Placement}
 \label{subsec:example-image-generation}
-% - Scenario: user prompt "A runner training at sunrise on a mountain trail"
-% - Pipeline: context extraction extracts running/outdoor topics → ad
-%   matching selects Nike Pegasus 41 (which has a product_image_url) →
-%   prompt rewriter produces an enhanced prompt placing the shoes on the
-%   runner's feet in the original scene → images.edit call with the
-%   product photo as a reference anchor → base64 image returned as
-%   data URI → ad metadata returned alongside the image
-% - Contrast with the no-match fallback: plain images.generate call with
-%   the user's original prompt, no ad metadata
+\input{sections/illustrative_examples/example6.tex}
  
 \input{sections/illustrative_examples/analytics_examples.tex}
  

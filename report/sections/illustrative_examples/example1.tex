@@ -1,0 +1,101 @@
+The first example traces a complete request through the ad-serving pipeline,
+from a user query about marathon footwear to an impression recorded in the
+database.  Figure~\ref{fig:example-1} shows the rendered response: the
+assistant naturally weaves in a \textsc{[Sponsored]} reference to the
+Nike Pegasus~41 as an inline hyperlink within an otherwise helpful answer.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{images/illustrative_example_1.png}
+    \caption{Chat interface response to ``What are the best running shoes for
+    marathon training?''.  The sponsored Nike Pegasus~41 recommendation appears
+    inline and clearly labelled.}
+    \label{fig:example-1}
+\end{figure}
+
+\subsubsection{Stage 1: Context Extraction}
+\label{subsubsec:example1-context}
+
+The orchestrator passes the raw message to the context-extraction module, which
+classifies intent, estimates ad receptivity, and infers a purchase-proximity
+signal.  For this query the extractor returns:
+
+\begin{lstlisting}[style=jsonstyle, caption={Context extraction output.},
+label={lst:example1-context}]
+{
+  "intent":          "product_research",
+  "ad_receptivity":  "medium",
+  "purchase_signal": 0.80,
+  "topics":          ["running shoes", "marathon training"],
+  "entities":        []
+}
+\end{lstlisting}
+
+\noindent
+A \texttt{purchase\_signal} of~0.80 boosts commercially relevant candidates in
+the re-ranker.  An \texttt{ad\_receptivity} of \texttt{medium} allows the
+pipeline to proceed; \texttt{none} would skip retrieval entirely.
+
+\subsubsection{Stage 2: Vector Search and Re-ranking}
+\label{subsubsec:example1-retrieval}
+
+The topics are concatenated into a retrieval string and encoded into a dense
+vector.  A nearest-neighbour search over the \texttt{pgvector} embeddings
+column returns the Nike Pegasus~41 at cosine similarity $0.7918$, with its
+campaign budget fields attached for the gate check:
+
+\begin{lstlisting}[style=jsonstyle, caption={Top vector-search candidate.},
+label={lst:example1-retrieval}]
+{
+  "ad_id":        "ad_nike_pegasus_41",
+  "product_name": "Nike Pegasus 41",
+  "similarity":   0.7918,
+  "bid_cpm":      5.00,
+  "daily_budget": 100.00,
+  "today_spend":  12.40
+}
+\end{lstlisting}
+
+\noindent
+The re-ranker combines similarity, bid CPM, and purchase signal into a
+composite score.  The budget gate confirms that
+$12.40 + 0.005 \ll 100.00$, so the ad passes and becomes the sole injection
+candidate.
+
+\subsubsection{Stage 3: Prompt Assembly}
+\label{subsubsec:example1-prompt}
+
+The winning ad is inserted into the synthesis prompt via a
+\texttt{<sponsored\_context>} block carrying the structured ad fields and
+its \emph{context guide}---a free-text presentation directive refined by the
+adaptive optimiser (see Section~\ref{subsec:example-context-optimization}):
+
+\begin{lstlisting}[style=jsonstyle, caption={Sponsored context block injected
+into the system prompt.}, label={lst:example1-prompt}]
+<sponsored_context>
+  <ad id="ad_nike_pegasus_41">
+    <product>Nike Pegasus 41</product>
+    <description>Responsive ZoomX foam; breathable Flyknit upper;
+      ideal for daily training and long-distance runs.</description>
+    <tracking_url>https://adservice.example/click/ad_nike_pegasus_41
+    </tracking_url>
+    <context_guide>
+      Integrate naturally as one option among several.  Always prefix
+      with [Sponsored].  Connect ZoomX cushioning and breathable upper
+      to the user's stated training goals.
+    </context_guide>
+  </ad>
+</sponsored_context>
+\end{lstlisting}
+
+\subsubsection{Stage 4: Response Generation and Impression Logging}
+\label{subsubsec:example1-response}
+
+The LLM opens with generic shoe-selection criteria, embeds the Nike
+Pegasus~41 as a \texttt{[Sponsored]} link, and closes with a breathability
+tip---consistent with the context guide's instruction to connect product
+features to the user's goals.  Once the response is streamed, the orchestrator
+fires two asynchronous writes: an impression event appended to the
+\texttt{events} table, and a \texttt{daily\_spend\_log} upsert that increments
+\texttt{spend} by $\text{bid\_cpm}/1000 = \$0.005$, keeping the budget gate
+current for all subsequent requests that day.

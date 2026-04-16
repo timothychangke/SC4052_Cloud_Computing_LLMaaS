@@ -1,0 +1,75 @@
+The fourth example demonstrates the engagement-classification stage that runs
+after every assistant response containing a sponsored ad.  A user who has just
+received the Nike Pegasus~41 recommendation follows up with
+\emph{``How does it compare to the Asics Nimbus?''}---a question that engages
+directly with the advertised product.  Figure~\ref{fig:example-4} shows the
+chat interface at this point in the conversation.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{images/illustrative_example_4.png}
+    \caption{Chat interface after the user asks a comparison question following
+    the Nike Pegasus~41 sponsored recommendation.  The follow-up triggers the
+    engagement classifier and a new engagement event is written to the database.}
+    \label{fig:example-4}
+\end{figure}
+
+\subsubsection{Stage 1: Engagement Classification}
+\label{subsubsec:example4-engagement}
+
+Once the response is streamed, the orchestrator dispatches the prior assistant
+turn and the new user message to the LLM-based engagement judge.  The judge
+evaluates whether the follow-up message constitutes genuine engagement with the
+sponsored product and, if so, characterises the nature of that engagement.  For
+this turn it returns:
+
+\begin{lstlisting}[style=jsonstyle, caption={Engagement classifier output for
+the comparison follow-up.}, label={lst:example4-engagement}]
+{
+  "engaged":               true,
+  "engagement_type":       "comparison",
+  "engagement_score":      0.82,
+  "ad_naturalness_score":  0.78,
+  "purchase_proximity":    0.55,
+  "sentiment_toward_ad":   "positive",
+  "follow_up_topic_match": true,
+  "reasoning": "User directly compares the advertised shoe to a competitor,
+                indicating active product consideration."
+}
+\end{lstlisting}
+
+\noindent
+The \texttt{engaged} flag is set to \texttt{true} because the user stayed on
+the product topic (\texttt{follow\_up\_topic\_match}: \texttt{true}) and asked
+a question that can only arise from genuine interest in the Nike Pegasus~41.
+The \texttt{engagement\_type} of \texttt{comparison} distinguishes this event
+from a simple \texttt{product\_inquiry}: the user is actively evaluating
+alternatives, which the classifier maps to a higher \texttt{purchase\_proximity}
+of~0.55 than a general enquiry would warrant.  The \texttt{ad\_naturalness\_score}
+of~0.78 reflects that the original recommendation felt sufficiently organic to
+invite a follow-up rather than prompt dismissal.
+
+\subsubsection{Stage 2: Event Persistence}
+\label{subsubsec:example4-persistence}
+
+The full classifier payload is written to the \texttt{events} table as an
+\texttt{engagement} event with \texttt{event\_type = "engagement"} and the JSON
+object stored in \texttt{events.payload}.  This record is the raw material for
+all downstream analytics: the engagement-analytics endpoint aggregates these
+payloads to compute per-ad averages of \texttt{engagement\_score},
+\texttt{ad\_naturalness\_score}, and \texttt{purchase\_proximity}, and counts
+occurrences of each \texttt{engagement\_type} to drive the engagement-type
+breakdown chart.
+
+\subsubsection{Stage 3: Analytics Reflection}
+\label{subsubsec:example4-analytics}
+
+After this event is logged the engagement-analytics page for the Nike
+Pegasus~41 ad updates to reflect the new data point.  The three sub-metric
+cards---engagement score, naturalness, and purchase proximity---each recalculate
+their weighted averages.  The engagement-type pie chart gains or enlarges a
+\emph{comparison} slice.  Because \texttt{purchase\_proximity} is now~0.55 (above
+the 0.4 caution threshold), no intervention flag is raised; if it had fallen
+below that threshold, the analytics view would highlight the ad as a candidate
+for context-level optimisation via the mechanism described in
+Example~\ref{subsec:example-optimization}.
