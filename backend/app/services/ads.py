@@ -1,5 +1,5 @@
 """
-Ad retrieval pipeline (Contract 4 — owned by backend).
+Ad retrieval pipeline
 
 Steps:
   1. pgvector cosine similarity search → top 20 raw candidates
@@ -7,8 +7,6 @@ Steps:
   3. Score: similarity*0.5 + normalised_bid*0.3 + purchase_signal*0.2
   4. Return top 3
 
-This is the only Contract the backend owns; everything else is the
-AI teammate's territory and we just call into their modules.
 """
 
 from __future__ import annotations
@@ -34,8 +32,6 @@ async def get_candidate_ads(
     """
     pool = get_pg()
 
-    # -- Step 1: vector similarity search (top 20) --
-    # pgvector's <=> operator is cosine distance, so similarity = 1 - distance
     embedding_str = "[" + ",".join(str(v) for v in query_embedding) + "]"
 
     rows = await pool.fetch(
@@ -79,7 +75,6 @@ async def get_candidate_ads(
         log.info("ad_retrieval.no_raw_candidates")
         return []
 
-    # -- Step 2: filter out ads we already showed this session --
     session = await get_session(session_id)
     shown_ids = set(session.get("ads_shown_this_session", []))
 
@@ -111,7 +106,6 @@ async def get_candidate_ads(
         log.info("ad_retrieval.all_filtered_out", shown_ids=list(shown_ids))
         return []
 
-    # -- Step 3: score with the agreed-upon formula --
     max_bid = max(c.bid_cpm for c in candidates) or 1.0
     for ad in candidates:
         ad.score = (
@@ -120,7 +114,6 @@ async def get_candidate_ads(
             + context.purchase_signal * 0.15
         )
 
-    # -- Step 4: return top 3 --
     candidates.sort(key=lambda a: a.score, reverse=True)
     top = candidates[:3]
 

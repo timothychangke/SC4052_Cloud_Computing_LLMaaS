@@ -1,11 +1,4 @@
-"""
-Thin dispatcher that picks the right implementation (mock vs real)
-based on AI_MODULE_MODE in config.
 
-When the AI teammate delivers their modules, drop them into
-app/services/ai_real.py with the same function signatures and
-flip the env var.  Nothing else in the codebase needs to change.
-"""
 
 from __future__ import annotations
 

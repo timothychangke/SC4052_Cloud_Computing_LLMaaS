@@ -4,8 +4,6 @@ Advertiser Portal API.
 Self-serve CRUD for advertisers, campaigns, and campaign-level ads,
 plus per-advertiser and per-campaign analytics.
 
-No auth yet — add middleware before going to prod.
-
 Endpoints:
 
   Advertisers:

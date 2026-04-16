@@ -1,8 +1,3 @@
-"""
-Shared data types that both the backend and the AI teammate's modules
-agree on.  Keep this in sync with ad-llm-interface-contracts.md.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -11,9 +6,6 @@ from typing import Optional
 from datetime import date
 
 from pydantic import BaseModel, Field
-
-
-# ── Enums ────────────────────────────────────────────────────────────────
 
 class AdReceptivity(str, Enum):
     HIGH = "high"
@@ -56,7 +48,6 @@ class EngagementType(str, Enum):
     NONE = "none"
 
 
-# ── Core domain objects (dataclasses for internal use) ───────────────────
 
 @dataclass
 class Turn:
@@ -112,8 +103,6 @@ class EngagementMetrics:
     purchase_proximity: float            # 0.0–1.0
     follow_up_topic_match: bool
     reasoning: str                       
-
-# ── Pydantic schemas for API request / response validation ──────────────
 
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=4000)
@@ -172,10 +161,6 @@ class AnalyticsSummary(BaseModel):
     top_ads: list[dict]
 
 
-# ── Advertiser Portal schemas ────────────────────────────────────────────
-
-# -- Advertiser --
-
 class AdvertiserCreatePayload(BaseModel):
     advertiser_id: str = Field(..., min_length=1, max_length=255)
     name: str = Field(..., min_length=1, max_length=500)
@@ -201,8 +186,6 @@ class AdvertiserResponse(BaseModel):
     status: str
     created_at: str
 
-
-# -- Campaign --
 
 class CampaignCreatePayload(BaseModel):
     name: str = Field(..., min_length=1, max_length=500)
@@ -234,8 +217,6 @@ class CampaignResponse(BaseModel):
     created_at: str
     updated_at: str
 
-
-# -- Campaign Ad (create ad within a campaign) --
 
 class CampaignAdCreatePayload(BaseModel):
     product_name: str = Field(..., min_length=1)

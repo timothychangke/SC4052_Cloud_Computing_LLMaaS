@@ -1,6 +1,4 @@
 """
-Admin API for ad management.  Temporary — gets replaced by a proper
-advertiser portal later.  No auth yet (add before going to prod obv).
 
 POST   /admin/ads           → bulk create
 GET    /admin/ads           → list with filters
@@ -27,16 +25,10 @@ router = APIRouter(prefix="/admin/ads", tags=["admin"])
 
 @router.post("")
 async def bulk_create_ads(ads: list[AdCreatePayload]):
-    """
-    Insert a batch of ads.  For each ad we compute the embedding vector
-    by calling the AI teammate's embed_ad() — or the mock if we're in
-    mock mode.
-    """
     pool = get_pg()
     created_ids = []
 
     for ad in ads:
-        # build the text blob we embed (same concat the teammate expects)
         embedding = await embed_ad(
             ad.product_name, ad.product_description, ad.target_topics, ad.target_intents
         )
@@ -95,7 +87,6 @@ async def list_ads(
 async def update_ad(ad_id: str, payload: AdUpdatePayload):
     pool = get_pg()
 
-    # build the SET clause dynamically based on what the caller sent
     updates = []
     params = []
     idx = 1
@@ -147,7 +138,6 @@ async def delete_ad(ad_id: str):
         raise HTTPException(status_code=404, detail="Ad not found")
     return {"deleted": ad_id}
 
-# ── Context Optimization ─────────────────────────────────────────────────
 
 @router.post("/{ad_id}/optimize-context")
 async def trigger_context_optimization(ad_id: str):

@@ -1,5 +1,5 @@
 """
-Basic health check.  Hit this to make sure the service is up
+Basic health check to make sure the service is up
 and can talk to Postgres + Redis.
 """
 
@@ -12,7 +12,6 @@ router = APIRouter(tags=["health"])
 
 @router.get("/health")
 async def health():
-    # quick sanity checks — if either of these fails the service is unhealthy
     pg_ok = False
     redis_ok = False
 

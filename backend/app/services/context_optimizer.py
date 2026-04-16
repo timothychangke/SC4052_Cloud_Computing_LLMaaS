@@ -27,7 +27,6 @@ async def optimize_ad_context(ad_id: str, lookback_days: int = 7) -> str | None:
     """
     pool = get_pg()
 
-    # ── 1. Fetch the ad ──────────────────────────────────────────────
     ad_row = await pool.fetchrow(
         """SELECT ad_id::text, product_name, product_description, creative_text,
                   target_topics, target_intents, ad_context, ad_context_version,
@@ -39,7 +38,6 @@ async def optimize_ad_context(ad_id: str, lookback_days: int = 7) -> str | None:
         log.warning("context_optimizer.ad_not_found", ad_id=ad_id)
         return None
 
-    # ── 2. Guard: too soon since last optimization? ──────────────────
     if ad_row["ad_context_updated_at"]:
         from datetime import datetime, timezone, timedelta
         hours_since = (
@@ -51,7 +49,6 @@ async def optimize_ad_context(ad_id: str, lookback_days: int = 7) -> str | None:
 
     current_context = ad_row["ad_context"] or "(no context yet)"
 
-    # ── 3. Fetch aggregated engagement metrics ───────────────────────
     metrics = await pool.fetchrow("""
         SELECT
             COUNT(*) as total_engagements,
@@ -74,14 +71,12 @@ async def optimize_ad_context(ad_id: str, lookback_days: int = 7) -> str | None:
                  engagements=metrics["total_engagements"])
         return None
 
-    # ── 4. Fetch impression count ────────────────────────────────────
     impressions = await pool.fetchval("""
         SELECT COUNT(*) FROM events
         WHERE ad_id = $1::uuid AND event_type = 'impression'
           AND created_at > NOW() - ($2 || ' days')::interval
     """, ad_id, str(lookback_days))
 
-    # ── 5. Fetch recent engagement samples (qualitative signal) ──────
     recent_feedback = await pool.fetch("""
         SELECT payload->>'reasoning' as reasoning,
                payload->>'engagement_type' as eng_type,
@@ -98,7 +93,6 @@ async def optimize_ad_context(ad_id: str, lookback_days: int = 7) -> str | None:
         for r in recent_feedback
     ) or "(no engagement data yet)"
 
-    # ── 6. Build optimization prompt ─────────────────────────────────
     eng_rate = (metrics["total_engagements"] / max(impressions, 1)) * 100
     avg_score = metrics["avg_engagement_score"] or 0
     avg_nat = metrics["avg_naturalness"] or 0
@@ -147,8 +141,6 @@ Based on the metrics above, write an IMPROVED context guide. Specifically:
 Return ONLY the improved context guide as plain text bullet points.
 Then on a new line, write "---REASONING---" followed by a brief explanation of what you changed and why."""
 
-    # ── 7. Call LLM ──────────────────────────────────────────────────
-    # ── 7. Call LLM (via dispatcher — respects AI_MODULE_MODE) ───────
     from app.core.config import get_settings
 
     if get_settings().ai_module_mode == "real":
@@ -160,7 +152,6 @@ Then on a new line, write "---REASONING---" followed by a brief explanation of w
         )
         output = resp.choices[0].message.content.strip()
     else:
-        # Mock: return a plausible improved context
         output = (
             f"• Lead with {ad_row['product_name']}'s strongest differentiator when the user is actively researching\n"
             f"• Use a casual, peer-recommendation tone — 'you might like' rather than 'you should buy'\n"
@@ -171,7 +162,6 @@ Then on a new line, write "---REASONING---" followed by a brief explanation of w
             f"Mock optimization: adjusted tone guidance for naturalness and added specificity to feature mentions."
         )
 
-    # ── 8. Parse context and reasoning ───────────────────────────────
     if "---REASONING---" in output:
         new_context, reasoning = output.split("---REASONING---", 1)
         new_context = new_context.strip()
@@ -180,7 +170,6 @@ Then on a new line, write "---REASONING---" followed by a brief explanation of w
         new_context = output
         reasoning = ""
 
-    # ── 9. Store updated context ─────────────────────────────────────
     new_version = (ad_row["ad_context_version"] or 0) + 1
 
     await pool.execute("""
@@ -191,7 +180,6 @@ Then on a new line, write "---REASONING---" followed by a brief explanation of w
         WHERE ad_id = $3::uuid
     """, new_context, new_version, ad_id)
 
-    # ── 10. Log to history table ─────────────────────────────────────
     metrics_snapshot = {
         "impressions": impressions,
         "total_engagements": metrics["total_engagements"],

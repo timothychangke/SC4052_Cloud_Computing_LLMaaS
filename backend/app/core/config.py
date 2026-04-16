@@ -1,6 +1,5 @@
 """
-Centralised config. Reads from environment / .env file so we never
-hard-code secrets or connection strings in application code.
+Centralised config. Reads from environment / .env file.
 """
 
 from pydantic_settings import BaseSettings
@@ -19,7 +18,6 @@ class Settings(BaseSettings):
     session_ttl_seconds: int = 1800  # 30 min inactivity
     max_history_turns: int = 10
 
-    # -- AI module mode: "mock" while teammate is still building, "real" for prod --
     ai_module_mode: str = "mock"
     
     # -- Groq secret key --

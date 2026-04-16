@@ -1,9 +1,3 @@
-"""
-Structured logging config.  Every log line comes out as JSON in prod
-and pretty-printed during local dev, which makes searching through
-orchestrator step latencies much easier.
-"""
-
 import logging
 import structlog
 
@@ -31,5 +25,4 @@ def setup_logging(json_output: bool = False):
         cache_logger_on_first_use=True,
     )
 
-    # tone down noisy third-party loggers
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
