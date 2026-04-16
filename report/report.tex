@@ -138,6 +138,77 @@
 }
 \lstset{style=pythonstyle}
 
+
+% New prompt style
+\usepackage{listings}
+\usepackage{xcolor}
+
+% --- Custom Colors for Academic Elegance ---
+\definecolor{codebg}{RGB}{250,250,250}
+\definecolor{promptbg}{RGB}{246,248,250} % Slightly blue/grey for prompts
+\definecolor{promptframe}{RGB}{100,149,237} % Cornflower blue for the left bar
+\definecolor{promptinst}{RGB}{200,80,0} % Rust color for <instructions>
+\definecolor{promptcomment}{RGB}{120,120,120}
+\definecolor{sqlkeyword}{RGB}{0,0,255}
+
+% 1. The new Prompt Style
+\lstdefinestyle{promptstyle}{
+    basicstyle=\footnotesize\ttfamily,
+    backgroundcolor=\color{promptbg},
+    frame=leftline,            % Clean left bar instead of a full box
+    framerule=3pt,             % Make the left bar distinct
+    rulecolor=\color{promptframe},
+    breaklines=true,
+    breakatwhitespace=true,
+    captionpos=b,
+    keepspaces=true,
+    % Dynamically highlight your <instruction> tags in italics & color
+    moredelim=[s][\color{promptinst}\itshape]{<}{>}, 
+    % Handle standard python/markdown comments used in your prompts
+    morecomment=[l][\color{promptcomment}\itshape]{\#},
+    aboveskip=1.5em,
+    belowskip=1.5em,
+    xleftmargin=1em,           % Give it some breathing room
+    showstringspaces=false
+}
+
+% 2. Improved SQL Style
+\lstdefinestyle{sqlstyle}{
+    language=SQL,
+    basicstyle=\footnotesize\ttfamily,
+    backgroundcolor=\color{codebg},
+    keywordstyle=\color{sqlkeyword}\bfseries,
+    stringstyle=\color{red!70!black},
+    commentstyle=\color{green!60!black}\itshape,
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    stepnumber=1,
+    frame=tb,                  % Top and bottom rules look very academic
+    breaklines=true,
+    captionpos=b,
+    showstringspaces=false,
+    aboveskip=1.5em,
+    belowskip=1.5em
+}
+
+% 3. Improved JSON Style
+\lstdefinestyle{jsonstyle}{
+    basicstyle=\footnotesize\ttfamily,
+    backgroundcolor=\color{codebg},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    stepnumber=1,
+    frame=tb,
+    breaklines=true,
+    captionpos=b,
+    showstringspaces=false,
+    aboveskip=1.5em,
+    belowskip=1.5em,
+    % Simple trick to make JSON strings/keys pop slightly
+    stringstyle=\color{blue!80!black},
+    morestring=[b]"
+}
+
 % ============================================================
 % TIKZ & PLOTS
 % ============================================================
@@ -295,19 +366,7 @@
 % ============================================================
 \pagenumbering{roman}
 
-% Abstract
-\begin{abstract}
-\noindent
-% TODO: Write 150–250 word abstract covering:
-% - Problem: Traditional display ads are poorly suited to conversational AI interfaces.
-% - Approach: An LLM-powered ad platform that extracts user intent from conversations,
-%   semantically matches relevant ads, and instructs the LLM to naturally weave sponsored
-%   product recommendations into helpful responses.
-% - Key components: context extraction, vector-based ad matching, prompt-engineered
-%   response synthesis with mandatory disclosure, and engagement analytics.
-% - Results/contribution: A working prototype demonstrating higher engagement potential
-%   through conversational ad delivery versus traditional impressions.
-\end{abstract}
+\input{sections/abstract.tex}
 
 \newpage
 \tableofcontents
@@ -419,78 +478,7 @@
  
 \input{sections/illustrative_examples/analytics_examples.tex}
  
-% ============================================================
-\section{Conclusions}
-\label{sec:conclusions}
-% ============================================================
- 
-\subsection{Summary of Contributions}
-\label{subsec:summary-contributions}
-% - End-to-end architecture for LLM-native conversational advertising
-%   spanning BOTH text and image modalities                            % REVISED
-% - Semantic ad matching via RAG-style vector retrieval + business-rule
-%   re-ranking + budget/schedule gating
-% - Prompt-engineered natural ad integration with mandatory FTC-compliant
-%   disclosure
-% - Multi-dimensional engagement measurement using an in-the-loop LLM
-%   judge (engagement score, naturalness, purchase proximity, sentiment,
-%   typed engagement taxonomy)                                         % REVISED
-% - Closed-loop adaptive optimisation of per-ad presentation context,
-%   driven by aggregated engagement metrics and versioned for auditability % NEW
-% - Image generation with diegetic product placement, optionally grounded
-%   on a reference product photo via an image-edit endpoint            % NEW
-% - Full advertiser portal with campaigns, budget/pacing, and self-serve
-%   ad creation including URL-based extraction                         % NEW
-% - Ethical safeguards: sensitivity-aware ad gating
- 
-\subsection{Workstream Contributions}
-\label{subsec:workstream-contributions}
-% - Backend/Infrastructure: orchestrator, session management, database
-%   schema (including campaigns / daily_spend_log / ad_context_history),
-%   ad matching pipeline with budget gating, click tracking and spend
-%   accounting, platform and advertiser analytics APIs, advertiser portal,
-%   image-generation endpoint, frontend integration                    % REVISED
-% - AI/LLM: context extraction, embedding pipeline, response synthesis
-%   with context-guide injection, engagement judge, initial-context
-%   generation, context optimiser, product-placement image prompting,
-%   URL product extraction, LLM-as-judge offline evaluator             % REVISED
- 
-\subsection{Limitations}
-\label{subsec:limitations}
-% - Dependence on third-party LLM and image APIs (latency, cost, availability)
-% - Heuristic re-ranking weights (not learned from data)
-% - LLM judge consistency: the engagement vector depends on a single model
-%   call per turn and may drift as the underlying judge model is updated % NEW
-% - Context optimiser evaluates aggregate metrics, not per-segment —
-%   one ad, one guide (no audience-conditional variants yet)           % NEW
-% - Image generation: no automated visual disclosure mechanism;
-%   trademark / trade-dress exposure not formally assessed             % NEW
-% - Small ad inventory for testing; scalability not yet validated
-% - No real advertiser feedback or A/B testing results
- 
-\subsection{Future Work}
-\label{subsec:future-work}
-% - Attention verification model (dwell time, read-through estimation)
-% - Predicted CTR model trained on click/engagement data to replace
-%   heuristic re-ranking weights
-% - Segment-conditional ad context (multiple guides per ad, selected by
-%   user segment or extracted context)                                 % NEW
-% - Judge ensembling and calibration to mitigate single-model drift     % NEW
-% - Visual-disclosure mechanisms for generated imagery (watermark,
-%   caption-level tagging, provenance metadata)                        % NEW
-% - A/B testing infrastructure for prompt and context-guide variants
-% - Tone adaptation: match ad copy to conversational register
-% - Brand safety and content filtering (topic classifier + blocklist)
-% - Billing/invoicing integration with the campaign spend ledger        % NEW
-% - Fine-tuning context extraction on domain-specific data
- 
-\subsection{Reflections}
-\label{subsec:reflections}
-% - Lessons learned from the two-workstream collaboration
-% - Prompt engineering iteration process and key insights
-% - Balancing user experience with monetisation goals
-% - Ethical considerations encountered during development, especially
-%   around sponsored generated imagery      
+\input{sections/conclusion.tex}   
 
 
 % ============================================================
@@ -499,98 +487,14 @@
 \newpage
 \printbibliography[heading=bibintoc, title={References}]
 
-% Placeholder: create a references.bib file with entries such as:
-% @article{vaswani2017attention,
-%   title={Attention is all you need},
-%   author={Vaswani, Ashish and others},
-%   journal={Advances in Neural Information Processing Systems},
-%   year={2017}
-% }
-% @misc{openai2023gpt4,
-%   title={GPT-4 Technical Report},
-%   author={{OpenAI}},
-%   year={2023}
-% }
-% @article{lewis2020rag,
-%   title={Retrieval-augmented generation for knowledge-intensive NLP tasks},
-%   author={Lewis, Patrick and others},
-%   journal={Advances in Neural Information Processing Systems},
-%   year={2020}
-% }
-% @misc{ftc2023endorsements,
-%   title={FTC Endorsement Guides},
-%   author={{Federal Trade Commission}},
-%   year={2023},
-%   url={https://www.ftc.gov/legal-library/browse/federal-register-notices/16-cfr-part-255-guides-concerning-use-endorsements-testimonials-advertising}
-% }
-
 
 % ============================================================
 % APPENDICES
 % ============================================================
 \newpage
-\begin{appendices}
 
-\section{Database Schema}
-\label{app:schema}
-% - Full CREATE TABLE statements for ads, events, advertisers
-% - Index definitions
-% - Include the SQL from the backend workstream document
+\input{sections/appendices.tex}
 
-\section{API Endpoint Specifications}
-\label{app:api-endpoints}
-% - Full request/response schemas for all endpoints
-% - POST /chat, GET /track/click, GET /analytics/summary, POST /admin/ads
-
-\section{Prompt Templates}
-\label{app:prompts}
-% - Context extraction prompt (full text)
-% - Response synthesis system prompt (full text)
-% - LLM-as-judge evaluation prompt (full text)
-
-\section{Context Extraction Test Cases}
-\label{app:test-cases-extraction}
-% - Table of 30+ test conversation snippets with expected extraction outputs
-
-\section{Response Synthesis Evaluation Set}
-\label{app:test-cases-synthesis}
-% - Table of 20–30 scenarios with expected quality scores
-
-\section{Session State Schema}
-\label{app:session-schema}
-% - Full Redis session object schema with field descriptions
-
-\section{Project Timeline}
-\label{app:timeline}
-% - Gantt chart or week-by-week table for both workstreams
-
-\begin{table}[H]
-    \centering
-    \caption{Project timeline by workstream.}
-    \label{tab:timeline}
-    \begin{tabular}{@{}clll@{}}
-        \toprule
-        \textbf{Week} & \textbf{Backend Workstream}    & \textbf{AI/LLM Workstream}    & \textbf{Milestone}    \\ \midrule
-        1   & Orchestrator skeleton, Redis,      & Context extraction prompt      & Infrastructure        \\
-            & Postgres + pgvector schema         & design + module                & foundation            \\[4pt]
-        2   & Ad CRUD API, bulk ingestion,       & Embedding functions,           & Ad matching           \\
-            & re-ranking logic                   & retrieval quality testing       & pipeline ready        \\[4pt]
-        3   & Click tracking, event logging,     & Response synthesis prompt       & Core pipeline         \\
-            & tracking link generator            & engineering + module           & complete              \\[4pt]
-        4   & Analytics API, frontend            & Eval set, quality tuning,      & End-to-end            \\
-            & integration, end-to-end wiring     & engagement classifier          & integration           \\[4pt]
-        5   & Error handling, monitoring,        & LLM-as-judge evaluator,        & Demo-ready            \\
-            & hardening                          & attention model start          & MVP                   \\
-        \bottomrule
-    \end{tabular}
-\end{table}
-
-\end{appendices}
-
-% ============================================================
-% GLOSSARY
-% ============================================================
-\newpage
 \printglossaries
 
 \end{document}

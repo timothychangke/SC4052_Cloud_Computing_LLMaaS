@@ -1,0 +1,78 @@
+\begin{abstract}
+\noindent
+Conversational AI chatbots like ChatGPT and Claude have taken over the kinds
+of queries that used to drive search engine advertising. These include areas like product research,
+comparison shopping, recommendation requests. Yet, they have no working
+advertising format of their own. Banner ads need screen space the chat
+surface does not have. Pop ups and interstitials break the back and forth
+flow that makes chatbots useful in the first place. Search style keyword
+auctions look at only the latest message and miss the context built up over
+a multi-turn conversation. The result is a large and growing commercial
+surface with no native way to monetise it.
+\newline \newline
+This report presents \emph{Ad LLM as a Service}. This is a working platform that
+lets a large language model weave sponsored product recommendations directly
+into its own replies, in a way that feels like a genuine suggestion rather
+than an inserted ad. The platform answers the X-as-a-Service brief by
+turning this capability of native conversational advertising into a
+cloud-served product that any advertiser can plug into. It realises the
+dual-utility crowdsourcing principle by design whereby every ad the system serves
+does two jobs at once, delivering a commercial impression to the advertiser
+and producing a structured record of how the user reacted, which the
+platform then uses to automatically improve how future ads are presented.
+\newline \newline
+The platform is built around eleven components organised into four layers.
+The chat pipeline is the core path every user message goes through. A
+lightweight model first reads the message to work out what the user wants
+and whether an ad would even be appropriate, a session store keeps the last
+ten turns of context in memory, a semantic search looks up the most
+relevant ads from the inventory, a ranker picks a winner by blending how
+well the ad matches, how much the advertiser is willing to pay, and how
+close the user seems to be to a purchase, and a second language model
+writes the final reply with the chosen ad woven in and a clear
+\texttt{[Sponsored]} label attached. Alongside the chat path, an
+image-generation surface does the same thing for pictures: when a user
+asks for an image, the platform quietly rewrites the prompt to place a
+matched product naturally into the scene, and, when the advertiser has
+supplied a real photograph of the product, feeds that photograph to the
+image model so the rendered version actually looks like the product rather
+than a guess at it.
+\newline \newline
+Behind the scenes, a feedback loop watches what users do next. After every
+ad, a judge model reads the follow up message and scores the interaction
+along six dimensions. They include things like whether the user engaged at all, how
+natural the ad felt, and how close they came to wanting to buy. Those scores 
+feed an agentic optimiser that decides on its own when an ad needs attention and 
+rewrites its presentation guide when the numbers start slipping. Every 
+rewrite is saved with a plain English
+explanation of why it was made, so the history of how each ad has been
+presented over time is fully auditable. On the commercial side, a
+self-serve portal lets advertisers sign up, create campaigns with total and
+daily budget caps, and draft ads by simply pasting a product URL that the
+system scrapes and fills in for them. Two dashboards, one for the platform
+operator, one for each advertiser, report performance live, and because
+both read directly from the same event log, the numbers on the screen
+always match the data driving the feedback loop.
+\newline \newline
+The user's answer is helpful whether or not
+an ad is shown. Ads are served only when they are relevant, in budget, and
+not already shown that session, with a last-second check right before the
+reply is generated. Every sponsored mention carries the
+\texttt{[Sponsored]} disclosure required by the FTC.
+Sensitive conversations, around health, grief, or financial hardship are
+excluded from advertising at the earliest possible point in the pipeline,
+and no bid or budget can override that. And the whole thing runs within a
+three-second response budget, falling back gracefully to a normal,
+unsponsored reply if any part of the ad pipeline fails. Our working prototype
+runs end-to-end through each of these behaviours,
+from successful ad placement and sensitivity suppression through to adaptive
+context revisions, image generation with product placement, budget
+exhaustion, and URL-based ad drafting. To the best of our knowledge, no
+existing open system brings semantic ad matching, natural LLM-written
+integration with mandatory disclosure, sensitivity-aware gating,
+multi-dimensional engagement measurement and organic product placement in generated images
+together within a single platform. Our optimiser also operates 
+without human prompting, surfacing its own diagnoses and applying its own fixes 
+within guardrails the platform enforces.
+
+\end{abstract}

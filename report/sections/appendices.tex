@@ -1,0 +1,582 @@
+\begin{appendices}
+
+% ------------------------------------------------------------
+\section{Database Schema}
+\label{app:schema}
+% ------------------------------------------------------------
+
+This appendix reproduces the full Postgres + pgvector schema executed
+at application startup by the \texttt{\_run\_migrations()} routine in
+\texttt{backend/app/main.py}. Every statement is idempotent, so the
+migration may be re-run safely on each deployment.
+
+\subsection*{Core tables}
+
+\begin{lstlisting}[style=sqlstyle, caption={Core table definitions.}]
+CREATE EXTENSION IF NOT EXISTS vector;
+
+CREATE TABLE IF NOT EXISTS ads (
+    ad_id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    advertiser_id       VARCHAR(255) NOT NULL,
+    product_name        VARCHAR(500) NOT NULL,
+    product_description TEXT,
+    target_topics       TEXT[],
+    target_intents      TEXT[],
+    creative_text       TEXT NOT NULL,
+    cta_url             VARCHAR(2048) NOT NULL,
+    bid_cpm             DECIMAL(10,2) NOT NULL,
+    budget_remaining    DECIMAL(10,2) NOT NULL,
+    brand_safety_tags   TEXT[],
+    embedding           vector(768),
+    active              BOOLEAN DEFAULT true,
+    created_at          TIMESTAMP DEFAULT NOW(),
+    updated_at          TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS events (
+    event_id    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    event_type  VARCHAR(50) NOT NULL,   -- impression | click | engagement
+    session_id  VARCHAR(255) NOT NULL,
+    ad_id       UUID REFERENCES ads(ad_id),
+    payload     JSONB NOT NULL,
+    created_at  TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS advertisers (
+    advertiser_id   VARCHAR(255) PRIMARY KEY,
+    name            VARCHAR(500) NOT NULL,
+    contact_email   VARCHAR(255),
+    company_name    VARCHAR(500),
+    billing_email   VARCHAR(255),
+    status          VARCHAR(50) DEFAULT 'active',
+    created_at      TIMESTAMP DEFAULT NOW()
+);
+\end{lstlisting}
+
+\subsection*{Campaign and budget tables}
+
+\begin{lstlisting}[style=sqlstyle, caption={Advertiser portal tables.}]
+CREATE TABLE IF NOT EXISTS campaigns (
+    campaign_id    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    advertiser_id  VARCHAR(255) NOT NULL REFERENCES advertisers(advertiser_id),
+    name           VARCHAR(500) NOT NULL,
+    status         VARCHAR(50) NOT NULL DEFAULT 'draft',
+    total_budget   DECIMAL(12,2) NOT NULL,
+    daily_budget   DECIMAL(12,2),
+    total_spent    DECIMAL(12,2) NOT NULL DEFAULT 0,
+    today_spent    DECIMAL(12,2) NOT NULL DEFAULT 0,
+    today_date     DATE NOT NULL DEFAULT CURRENT_DATE,
+    start_date     DATE,
+    end_date       DATE,
+    created_at     TIMESTAMP DEFAULT NOW(),
+    updated_at     TIMESTAMP DEFAULT NOW()
+);
+
+ALTER TABLE ads ADD COLUMN IF NOT EXISTS campaign_id
+    UUID REFERENCES campaigns(campaign_id);
+
+CREATE TABLE IF NOT EXISTS daily_spend_log (
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    campaign_id  UUID NOT NULL REFERENCES campaigns(campaign_id),
+    spend_date   DATE NOT NULL,
+    impressions  INT NOT NULL DEFAULT 0,
+    clicks       INT NOT NULL DEFAULT 0,
+    engagements  INT NOT NULL DEFAULT 0,
+    spend        DECIMAL(12,2) NOT NULL DEFAULT 0,
+    UNIQUE(campaign_id, spend_date)
+);
+\end{lstlisting}
+
+\subsection*{Adaptive ad-context tables}
+
+\begin{lstlisting}[style=sqlstyle, caption={Tables supporting the adaptive
+    context-optimisation loop (Section~\ref{subsubsec:adaptive-optimisation}).}]
+ALTER TABLE ads ADD COLUMN IF NOT EXISTS ad_context TEXT DEFAULT '';
+ALTER TABLE ads ADD COLUMN IF NOT EXISTS ad_context_version INT DEFAULT 0;
+ALTER TABLE ads ADD COLUMN IF NOT EXISTS ad_context_updated_at TIMESTAMPTZ;
+
+CREATE TABLE IF NOT EXISTS ad_context_history (
+    id                     SERIAL PRIMARY KEY,
+    ad_id                  UUID REFERENCES ads(ad_id),
+    version                INT NOT NULL,
+    context_text           TEXT NOT NULL,
+    optimization_reasoning TEXT,
+    metrics_snapshot       JSONB,
+    created_at             TIMESTAMPTZ DEFAULT NOW()
+);
+\end{lstlisting}
+
+\subsection*{Indexes}
+
+\begin{lstlisting}[style=sqlstyle, caption={Index definitions. The
+    IVFFlat vector index is created empty and becomes effective once
+    ads are inserted.}]
+CREATE INDEX ads_embedding_idx           ON ads USING ivfflat
+    (embedding vector_cosine_ops) WITH (lists = 10);
+CREATE INDEX idx_events_type             ON events(event_type);
+CREATE INDEX idx_events_ad_id            ON events(ad_id);
+CREATE INDEX idx_events_created          ON events(created_at);
+CREATE INDEX idx_campaigns_advertiser    ON campaigns(advertiser_id);
+CREATE INDEX idx_campaigns_status        ON campaigns(status);
+CREATE INDEX idx_ads_campaign            ON ads(campaign_id);
+CREATE INDEX idx_daily_spend_campaign    ON daily_spend_log(campaign_id, spend_date);
+CREATE INDEX idx_context_history_ad      ON ad_context_history(ad_id);
+\end{lstlisting}
+
+\paragraph{Notes on dimension choice.} The \texttt{embedding} column is
+\texttt{vector(768)} to match the output dimensionality of the
+locally-hosted \texttt{sentence-transformers/all-mpnet-base-v2} model
+used by \texttt{ai\_real.py}. Switching to a different embedding
+backbone (for example OpenAI's \texttt{text-embedding-3-small} at 1536
+dimensions) requires altering both this column and the corresponding
+ingestion code.
+
+
+% ------------------------------------------------------------
+\section{API Endpoint Specifications}
+\label{app:api-endpoints}
+% ------------------------------------------------------------
+
+This appendix documents the request and response contracts for every
+HTTP endpoint exposed by the FastAPI orchestrator. Endpoints fall into
+four groups: the user-facing chat path, click tracking, the global
+analytics summary, the admin ad-management API, and the advertiser
+portal.
+
+\subsection*{Chat path: \texttt{POST /chat}}
+
+\begin{lstlisting}[style=jsonstyle, caption={\texttt{POST /chat} request body.}]
+{
+  "message":    "What running shoes do you recommend?",
+  "session_id": "c3f1a9e2-..."
+}
+\end{lstlisting}
+
+\begin{lstlisting}[style=jsonstyle, caption={\texttt{POST /chat} response body. The
+    \texttt{ad\_metadata} object is \texttt{null} when no ad was injected.}]
+{
+  "response": "For daily training you want a neutral cushioned shoe ...
+               [Sponsored] The [Nike Pegasus 41](http://localhost:8000/track/
+               click?ad_id=...&session_id=...&redirect=...) is a solid pick.",
+  "ad_metadata": {
+    "ad_id":     "a1b2c3d4-...",
+    "sponsored": true
+  }
+}
+\end{lstlisting}
+
+\subsection*{Image generation: \texttt{POST /generate-image}}
+
+\begin{lstlisting}[style=jsonstyle, caption={Image generation contract.}]
+// Request
+{
+  "prompt":     "A runner training at sunrise in the park",
+  "session_id": "c3f1a9e2-..."
+}
+
+// Response
+{
+  "image_url":       "data:image/png;base64,iVBORw0KGgo...",
+  "enhanced_prompt": "A runner training at sunrise in the park, wearing
+                      the Nike Pegasus 41 ...",
+  "ad_metadata":     { "ad_id": "a1b2c3d4-...", "sponsored": true }
+}
+\end{lstlisting}
+
+\subsection*{Click tracking: \texttt{GET /track/click}}
+
+Query parameters: \texttt{ad\_id} (UUID), \texttt{session\_id} (string),
+\texttt{redirect} (target URL). The endpoint logs a click event and
+responds with a \texttt{302 Found} whose \texttt{Location} header is
+the decoded \texttt{redirect} URL.
+
+\subsection*{Global analytics: \texttt{GET /analytics/summary}}
+
+Query parameter: \texttt{days} (integer, default 7).
+
+\begin{lstlisting}[style=jsonstyle, caption={\texttt{GET /analytics/summary} response.}]
+{
+  "impressions":       14320,
+  "clicks":            287,
+  "engagements":       412,
+  "ctr":               0.0200,
+  "estimated_revenue": 178.99,
+  "top_ads": [
+    { "product_name": "Nike Pegasus 41",
+      "ad_id":        "a1b2c3d4-...",
+      "impressions":  3200,
+      "clicks":       64,
+      "engagements":  89 }
+  ]
+}
+\end{lstlisting}
+
+\subsection*{Admin ad management: \texttt{/admin/ads}}
+
+\begin{itemize}[leftmargin=1.5em, itemsep=0.2em]
+  \item \texttt{POST /admin/ads} --- bulk create, body is an array of
+        \texttt{AdCreatePayload} objects (see below). Returns the list
+        of created \texttt{ad\_id} values.
+  \item \texttt{GET /admin/ads} --- list ads, optional filters
+        \texttt{advertiser\_id}, \texttt{active\_only}, \texttt{limit},
+        \texttt{offset}.
+  \item \texttt{PATCH /admin/ads/\{ad\_id\}} --- body is an
+        \texttt{AdUpdatePayload} (see below).
+  \item \texttt{DELETE /admin/ads/\{ad\_id\}} --- soft delete (sets
+        \texttt{active=false}), returns \texttt{\{"deleted": "ad\_id"\}}.
+\end{itemize}
+
+\begin{lstlisting}[style=jsonstyle, caption={\texttt{AdCreatePayload} schema.}]
+{
+  "advertiser_id":       "adv_nike",
+  "product_name":        "Nike Pegasus 41",
+  "product_description": "Lightweight daily trainer for neutral runners",
+  "target_topics":       ["running shoes", "marathon", "jogging"],
+  "target_intents":      ["product_research", "comparison", "purchase"],
+  "creative_text":       "The Nike Pegasus 41 offers responsive ZoomX foam ...",
+  "cta_url":             "https://nike.com/pegasus-41",
+  "bid_cpm":             12.50,
+  "budget_remaining":    5000.00,
+  "brand_safety_tags":   ["sports", "fitness"]
+}
+\end{lstlisting}
+
+\begin{lstlisting}[style=jsonstyle, caption={\texttt{AdUpdatePayload} schema (all fields optional).}]
+{
+  "budget_remaining": 3000.00,
+  "active":           true,
+  "creative_text":    "Updated copy ...",
+  "bid_cpm":          14.00
+}
+\end{lstlisting}
+
+\subsection*{Advertiser portal: \texttt{/portal/*}}
+
+The portal exposes CRUD and analytics endpoints for advertisers,
+campaigns, and campaign-scoped ads. A full list is given in
+Table~\ref{tab:portal-endpoints}.
+
+\begin{table}[H]
+    \centering
+    \caption{Advertiser portal endpoints.}
+    \label{tab:portal-endpoints}
+    \footnotesize
+    \begin{tabular}{@{}llp{7cm}@{}}
+        \toprule
+        \textbf{Method} & \textbf{Path} & \textbf{Description} \\ \midrule
+        POST    & \texttt{/portal/advertisers}                            & Register a new advertiser.           \\
+        GET     & \texttt{/portal/advertisers}                            & List advertisers (filter by status). \\
+        GET     & \texttt{/portal/advertisers/\{id\}}                     & Advertiser detail.                   \\
+        PATCH   & \texttt{/portal/advertisers/\{id\}}                     & Update advertiser fields.            \\
+        POST    & \texttt{/portal/advertisers/\{id\}/campaigns}           & Create a campaign.                   \\
+        GET     & \texttt{/portal/advertisers/\{id\}/campaigns}           & List an advertiser's campaigns.      \\
+        GET     & \texttt{/portal/campaigns/\{id\}}                       & Campaign detail.                     \\
+        PATCH   & \texttt{/portal/campaigns/\{id\}}                       & Update campaign fields.              \\
+        POST    & \texttt{/portal/campaigns/\{id\}/pause}                 & Pause an active campaign.            \\
+        POST    & \texttt{/portal/campaigns/\{id\}/resume}                & Resume draft or paused campaign.     \\
+        POST    & \texttt{/portal/ads/extract-from-url}                   & Extract ad fields from a product URL.\\
+        POST    & \texttt{/portal/campaigns/\{id\}/ads}                   & Create one or more ads.              \\
+        GET     & \texttt{/portal/campaigns/\{id\}/ads}                   & List ads in a campaign.              \\
+        PATCH   & \texttt{/portal/ads/\{ad\_id\}}                         & Update an ad.                        \\
+        DELETE  & \texttt{/portal/ads/\{ad\_id\}}                         & Soft-delete an ad.                   \\
+        GET     & \texttt{/portal/advertisers/\{id\}/analytics}           & Advertiser-level rollup.             \\
+        GET     & \texttt{/portal/campaigns/\{id\}/analytics}             & Campaign detail with daily series.   \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\begin{lstlisting}[style=jsonstyle, caption={Campaign creation payload.}]
+{
+  "name":         "Spring Running Campaign",
+  "total_budget": 10000.00,
+  "daily_budget": 500.00,
+  "start_date":   "2025-04-01",
+  "end_date":     "2025-06-30"
+}
+\end{lstlisting}
+
+\begin{lstlisting}[style=jsonstyle, caption={Campaign analytics response.}]
+{
+  "campaign_id":     "f47ac10b-...",
+  "campaign_name":   "Spring Running Campaign",
+  "status":          "active",
+  "total_budget":    10000.00,
+  "total_spent":     2345.50,
+  "impressions":     18700,
+  "clicks":          374,
+  "engagements":     510,
+  "ctr":             0.02,
+  "daily_breakdown": [
+    { "date": "2025-03-15", "impressions": 620, "clicks": 12,
+      "engagements": 18, "spend": 78.50 }
+  ]
+}
+\end{lstlisting}
+
+
+% ------------------------------------------------------------
+\section{Prompt Templates}
+\label{app:prompts}
+% ------------------------------------------------------------
+
+All three of the production LLM prompts are reproduced verbatim from
+\texttt{backend/app/services/ai\_real.py}. Placeholders of the form
+\texttt{\{variable\}} are substituted by the orchestrator before the
+prompt is sent to the model.
+
+\subsection*{Context extraction prompt}
+
+Sent to the Haiku-tier model on every incoming turn. The expected
+output is a single strict-JSON object matching the schema in
+Section~\ref{subsubsec:context-extraction}.
+
+\begin{lstlisting}[style=promptstyle, caption={Context extraction prompt
+    (\texttt{real\_extract\_context}).}]
+Analyse the conversation below and the latest user message.
+Return a JSON object with EXACTLY these fields --- no extra text:
+
+{
+  "intent": "<one of: product_research, comparison, purchase,
+             general_question, casual_chat, support, complaint, sensitive>",
+  "topics": ["<topic1>", ...],
+  "entities": ["<brand or product name>", ...],
+  "sentiment": "<one of: positive, neutral, negative, mixed>",
+  "purchase_signal": <float 0.0-1.0>,
+  "ad_receptivity": "<one of: high, medium, low, none>"
+}
+
+Conversation history:
+{history_text}
+
+Latest user message: {message}
+\end{lstlisting}
+
+\subsection*{Ad-side keyword extraction prompt}
+
+Used at ad-ingestion time by \texttt{real\_embed\_ad}. It extracts the
+same structured vocabulary that \texttt{real\_embed\_query} produces on
+the query side, so that both sides of the cosine search live in the
+same semantic space.
+
+\begin{lstlisting}[style=promptstyle, caption={Ad keyword extraction prompt
+    (\texttt{real\_embed\_ad}).}]
+Extract keywords from this advertisement for semantic ad-matching.
+Return a JSON object with EXACTLY these fields --- no extra text:
+
+{
+  "intent":   "<one of: product_research, comparison, purchase, general_question>",
+  "topics":   ["<topic1>", ...],
+  "entities": ["<brand or product name>", ...],
+  "sentiment": "<one of: positive, neutral>"
+}
+
+Product name: {product_name}
+Description:  {product_description}
+Target topics:  {target_topics}
+Target intents: {target_intents}
+\end{lstlisting}
+
+\subsection*{Response synthesis system prompt}
+
+Issued to the main response model. When an ad is selected the
+\texttt{sponsored\_block} is appended to the system content; when no
+ad is selected the same call is made without it.
+
+\begin{lstlisting}[style=promptstyle, caption={Response synthesis system
+    prompt (\texttt{real\_generate\_response}).}]
+# Base system content
+You are a helpful, friendly shopping and lifestyle assistant.
+Respond conversationally and helpfully.
+Keep replies concise (2-4 sentences). Use markdown where it helps.
+
+# Sponsored block, appended only when a candidate ad is available
+You MUST include exactly one sponsored product mention in your response.
+Format it as markdown: [Sponsored] The [{product_name}]({tracking_url})
+--- <one compelling reason>.
+
+Ad details --- Product: {product_name}.
+Description:  {product_description}.
+Creative:     {creative_text}.
+\end{lstlisting}
+
+\subsection*{Image-placement prompt rewriter}
+
+Used by \texttt{\_build\_product\_placement\_prompt} to inject the
+advertised product into a user-authored image prompt without losing
+the user's scene.
+
+\begin{lstlisting}[style=promptstyle, caption={Image-placement prompt rewriter.}]
+You are an expert image-prompt engineer for an advertising platform.
+A user wants to generate an image. Your job is to rewrite their prompt
+so the advertised product appears naturally in the scene --- visible
+but not forced.
+
+User's original prompt: {user_prompt}
+
+Product to place:    {product_name}
+Product description: {product_description}
+
+Rules:
+- Keep the core scene the user described.
+- Add the product in a way that fits the environment (on a shelf, in
+  someone's hand, on a table, being worn by someone).
+- Keep the rewritten prompt under 200 words.
+- Return ONLY the rewritten image prompt, no explanation or preamble.
+\end{lstlisting}
+
+\subsection*{LLM-as-judge engagement-detection prompt}
+
+Invoked one turn after an ad is served. The schema includes a boolean
+\texttt{engaged} flag plus finer-grained signals used by the adaptive
+ad-context optimiser.
+
+\begin{lstlisting}[style=promptstyle, caption={Engagement / LLM-judge prompt
+    (\texttt{real\_detect\_engagement}).}]
+Analyse whether the user engaged with the advertised product in their
+follow-up message.
+
+Advertised product:  {product_name}
+Product description: {product_description}
+
+Assistant response that contained the ad:
+{assistant_response}
+
+Recent conversation context:
+{history_snippet}
+
+User's follow-up message: {follow_up_message}
+
+Return a JSON object with EXACTLY these fields --- no extra text:
+
+{
+  "engaged":               <true or false>,
+  "engagement_type":       "<one of: product_inquiry, comparison, price_inquiry,
+                            purchase_intent, feature_question, positive_reaction,
+                            negative_reaction, dismissal, none>",
+  "engagement_score":      <float 0.0-1.0, how strongly the user engaged>,
+  "sentiment_toward_ad":   "<one of: positive, neutral, negative>",
+  "ad_naturalness_score":  <float 0.0-1.0, how natural the ad felt>,
+  "purchase_proximity":    <float 0.0-1.0, proximity to a purchase>,
+  "follow_up_topic_match": <true if user stayed on the product topic>,
+  "reasoning":             "<one sentence explaining your assessment>"
+}
+\end{lstlisting}
+
+\subsection*{Initial ad-context generation prompt}
+
+Used once per ad at creation time to seed the
+\texttt{ad\_context} field that drives the adaptive optimiser.
+
+\begin{lstlisting}[style=promptstyle, caption={Initial ad-context prompt
+    (\texttt{real\_generate\_initial\_context}).}]
+You are an advertising strategist for a conversational AI platform.
+Given the following ad details, write a concise context guide (3-5
+bullet points) that will help an AI assistant naturally recommend this
+product in conversation.
+
+Focus on:
+- The most compelling angle to introduce this product
+- The tone and framing that would feel natural (not salesy)
+- Key differentiators to highlight
+- What user intents/situations this product is best suited for
+- What to avoid (e.g., don't oversell, don't compare negatively to
+  competitors)
+
+Ad Details:
+- Product:       {product_name}
+- Description:   {product_description}
+- Creative Text: {creative_text}
+- Target Topics:  {target_topics}
+- Target Intents: {target_intents}
+
+Return ONLY the context guide as plain text bullet points. No preamble.
+\end{lstlisting}
+
+
+
+% ------------------------------------------------------------
+\section{Session State Schema}
+\label{app:session-schema}
+% ------------------------------------------------------------
+
+The session store is a single Redis instance keyed by
+\texttt{session:\{session\_id\}}. The object stored at each key is
+JSON-serialised and refreshed with a sliding TTL (default 1800
+seconds) on every read-modify-write cycle. The canonical shape,
+written by \texttt{backend/app/services/session.py}, is:
+
+\begin{lstlisting}[style=jsonstyle, caption={Redis session object.}]
+{
+  "turns": [
+    { "role": "user",
+      "content": "What running shoes do you recommend?",
+      "timestamp": "2025-03-15T10:30:00+00:00",
+      "ad_id": null },
+    { "role": "assistant",
+      "content": "For daily training you want a neutral cushioned ...",
+      "timestamp": "2025-03-15T10:30:02+00:00",
+      "ad_id": "a1b2c3d4-..." }
+  ],
+  "accumulated_topics":        ["running", "shoes", "marathon"],
+  "purchase_signals_history":  [0.20, 0.45, 0.78],
+  "ads_shown_this_session":    ["a1b2c3d4-...", "b2c3d4e5-..."],
+  "turn_count":                7,
+  "created_at":                "2025-03-15T10:29:45+00:00",
+  "last_active":               "2025-03-15T10:30:02+00:00"
+}
+\end{lstlisting}
+
+\begin{table}[H]
+    \centering
+    \caption{Session field reference.}
+    \label{tab:session-fields}
+    \footnotesize
+    \begin{tabular}{@{}lp{3.3cm}p{7.5cm}@{}}
+        \toprule
+        \textbf{Field} & \textbf{Type} & \textbf{Semantics} \\ \midrule
+        \texttt{turns}                    & list of Turn      & Rolling window of the last \texttt{MAX\_HISTORY\_TURNS} turns (default 10). Trimmed on every \texttt{append\_turn}. Each turn stores \texttt{role}, \texttt{content}, ISO-8601 \texttt{timestamp}, and an optional \texttt{ad\_id}. \\
+        \texttt{accumulated\_topics}      & list[str]         & De-duplicated union of topics across all turns in the session. Used by the re-ranker to bias retrieval towards persistent conversational themes.                                                                                 \\
+        \texttt{purchase\_signals\_history} & list[float]     & Sequence of \texttt{purchase\_signal} values produced by the context extractor, one per user turn. Enables the re-ranker to detect monotone escalation.                                                                          \\
+        \texttt{ads\_shown\_this\_session}& list[str]         & UUIDs of ads previously served in the session, used for frequency capping inside the re-ranker's candidate filter.                                                                                                               \\
+        \texttt{turn\_count}              & int               & Monotonically increasing counter incremented by \texttt{append\_turn}; not trimmed when the rolling window is trimmed.                                                                                                            \\
+        \texttt{created\_at}              & ISO-8601 str      & First write timestamp; fixed for the lifetime of the session.                                                                                                                                                                    \\
+        \texttt{last\_active}             & ISO-8601 str      & Refreshed on every \texttt{save\_session}. The TTL resets from this point.                                                                                                                                                        \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\paragraph{Defaults and fallback behaviour.} A \texttt{get\_session}
+call on a non-existent key returns a freshly-constructed object with
+empty lists, \texttt{turn\_count} of zero, and both timestamps set to
+the current instant. A Redis outage is treated as a session cache
+miss: the current turn is processed in isolation, no frequency cap is
+enforced, and the within-session adaptive loop is skipped for that
+turn only. This is consistent with the degraded-mode policy described
+in Section~\ref{subsec:error-handling}.
+
+\section{Project Timeline}
+\label{app:timeline}
+% - Gantt chart or week-by-week table for both workstreams
+
+\begin{table}[H]
+    \centering
+    \caption{Project timeline by workstream.}
+    \label{tab:timeline}
+    \begin{tabular}{@{}clll@{}}
+        \toprule
+        \textbf{Week} & \textbf{Backend Workstream (Timothy)}    & \textbf{AI/LLM Workstream (Joel)}    & \textbf{Milestone}    \\ \midrule
+        1   & Orchestrator skeleton, Redis,      & Context extraction prompt      & Infrastructure        \\
+            & Postgres + pgvector schema         & design + module                & foundation            \\[4pt]
+        2   & Ad CRUD API, bulk ingestion,       & Embedding functions,           & Ad matching           \\
+            & re-ranking logic                   & retrieval quality testing       & pipeline ready        \\[4pt]
+        3   & Click tracking, event logging,     & Response synthesis prompt       & Core pipeline         \\
+            & tracking link generator            & engineering + module           & complete              \\[4pt]
+        4   & Analytics API, frontend            & Eval set, quality tuning,      & End-to-end            \\
+            & integration, end-to-end wiring     & engagement classifier          & integration           \\[4pt]
+        5   & Error handling, monitoring,        & LLM-as-judge evaluator,        & Demo-ready            \\
+            & hardening                          & attention model start          & MVP                   \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\end{appendices}
