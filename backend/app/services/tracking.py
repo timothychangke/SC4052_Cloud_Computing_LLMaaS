@@ -24,7 +24,6 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-# ── Tracking URL generation ─────────────────────────────────────────────
 
 def generate_tracking_url(ad_id: str, session_id: str, cta_url: str) -> str:
     """
@@ -49,7 +48,6 @@ def generate_tracking_urls(ads: list, session_id: str) -> dict[str, str]:
     }
 
 
-# ── Event logging ────────────────────────────────────────────────────────
 
 async def log_impression(session_id: str, ad_id: str, turn_number: int):
     """
@@ -79,7 +77,6 @@ async def log_impression(session_id: str, ad_id: str, turn_number: int):
         ad_id,
     )
 
-    # ── campaign-level budget tracking ───────────────────────────────
     campaign_row = await pool.fetchrow(
         "SELECT campaign_id, bid_cpm FROM ads WHERE ad_id = $1::uuid",
         ad_id,

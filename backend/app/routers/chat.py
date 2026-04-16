@@ -53,20 +53,16 @@ async def chat(req: ChatRequest):
     print(f"      message: {message[:120]}")
     print(f"{'='*60}")
 
-    # ── 1. Load session ──────────────────────────────────────────────
     session_data = await sess.get_session(session_id)
     history = sess.session_turns_to_domain(session_data)
     print(f"[1/7] Session loaded  turns={len(history)}")
 
-    # ── 2. Check if previous turn had an ad → run engagement detection ─
     print(f"[2/7] Checking engagement with previous ad...")
     await _maybe_detect_engagement(message, session_data, session_id)
 
-    # ── 3. Save the user's turn right away ───────────────────────────
     await sess.append_turn(session_id, role="user", content=message)
     print(f"[3/7] User turn saved")
 
-    # ── 4. Extract context ───────────────────────────────────────────
     print(f"[4/7] Extracting context...")
     context = None
     try:
@@ -83,7 +79,6 @@ async def chat(req: ChatRequest):
         print(f"      [WARN] context extraction failed: {exc}")
         log.warning("chat.context_extraction_failed", error=str(exc))
 
-    # ── 5. Ad matching (only if context says we should) ──────────────
     candidate_ads = []
     tracking_urls: dict[str, str] = {}
 
@@ -108,7 +103,6 @@ async def chat(req: ChatRequest):
     else:
         print(f"[5/7] Ad matching skipped  (receptivity={getattr(context, 'ad_receptivity', 'no-context')})")
 
-    # ── 6. Generate the response ─────────────────────────────────────
     print(f"[6/7] Generating response  ads_available={len(candidate_ads)}...")
     response_obj = None
     retry_count = 0
@@ -145,7 +139,6 @@ async def chat(req: ChatRequest):
 
     print(f"      ad_included={response_obj.ad_included}  ad_id={response_obj.ad_id_used}")
 
-    # ── 7. Log impression + update session ───────────────────────────
     print(f"[7/7] Logging impression and updating session...")
     ad_meta = None
     ad_id_for_turn = None
@@ -182,7 +175,6 @@ async def chat(req: ChatRequest):
     return ChatResponse(response=response_obj.response_text, ad_metadata=ad_meta)
 
 
-# ── Image generation with product placement ──────────────────────────────
 
 @router.post("/generate-image", response_model=ImageGenerateResponse)
 async def generate_image(req: ImageGenerateRequest):
@@ -195,12 +187,10 @@ async def generate_image(req: ImageGenerateRequest):
     print(f"      prompt: {prompt[:120]}")
     print(f"{'='*60}")
 
-    # ── 1. Load session ──────────────────────────────────────────────
     session_data = await sess.get_session(session_id)
     history = sess.session_turns_to_domain(session_data)
     print(f"[1/5] Session loaded  turns={len(history)}")
 
-    # ── 2. Extract context for ad matching ──────────────────────────
     print(f"[2/5] Extracting context from prompt...")
     context = None
     try:
@@ -211,7 +201,6 @@ async def generate_image(req: ImageGenerateRequest):
         print(f"      [WARN] context extraction failed: {exc}")
         log.warning("generate_image.context_extraction_failed", error=str(exc))
 
-    # ── 3. Ad matching ───────────────────────────────────────────────
     chosen_ad = None
     if context :
         print(f"[3/5] Ad matching for product placement...")
@@ -231,18 +220,15 @@ async def generate_image(req: ImageGenerateRequest):
     else:
         print(f"[3/5] Ad matching skipped  (receptivity={getattr(context, 'ad_receptivity', 'no-context')})")
 
-    # ── 4. Generate image (with product placement if ad matched) ─────
     print(f"[4/5] Generating image  product_placement={chosen_ad is not None}...")
     try:
         result = await ai.generate_image(prompt, chosen_ad)
         print(f"      Enhanced prompt: {result['enhanced_prompt'][:120]}")
-        # print(f"      Image URL: {result['image_url']}")
     except Exception as exc:
         print(f"      [ERROR] image generation failed: {exc}")
         log.error("generate_image.generation_failed", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="Image generation failed.")
 
-    # ── 5. Log impression + return ───────────────────────────────────
     print(f"[5/5] Logging impression and returning response...")
     ad_meta = None
     if chosen_ad:
@@ -268,7 +254,6 @@ async def generate_image(req: ImageGenerateRequest):
     )
 
 
-# ── Helper: engagement detection for the previous turn's ad ─────────────
 
 async def _maybe_detect_engagement(
     current_message: str,
@@ -290,8 +275,6 @@ async def _maybe_detect_engagement(
     ad_id = last_turn["ad_id"]
 
     try:
-        # we need the Ad object to pass to the engagement detector
-        # quick fetch from the DB
         from app.core.db import get_pg
         row = await get_pg().fetchrow(
             """
@@ -348,5 +331,4 @@ async def _maybe_detect_engagement(
             )
 
     except Exception as exc:
-        # engagement detection is nice-to-have — never crash the request over it
         log.warning("chat.engagement_detection_failed", error=str(exc))

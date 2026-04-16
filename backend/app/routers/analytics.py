@@ -2,8 +2,7 @@
 GET /analytics/summary  —  quick dashboard numbers.
 
 Returns impressions, clicks, engagements, CTR, estimated revenue,
-and the top-performing ads over a given window.  Simple enough to
-power an internal dashboard; we'll make it fancier later.
+and the top-performing ads over a given window.  
 """
 
 from __future__ import annotations

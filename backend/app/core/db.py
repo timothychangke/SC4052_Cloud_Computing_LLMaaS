@@ -11,7 +11,6 @@ import structlog
 
 log = structlog.get_logger()
 
-# module-level refs that get populated in init_pools()
 _pg_pool: asyncpg.Pool | None = None
 _redis: aioredis.Redis | None = None
 

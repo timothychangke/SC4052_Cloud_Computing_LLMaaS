@@ -1,12 +1,4 @@
-"""
-Mock implementations of every AI/LLM contract.
 
-These exist so the backend can be developed and tested end-to-end
-before the teammate's real modules are ready.  Flip AI_MODULE_MODE
-from "mock" to "real" in .env once the teammate delivers.
-
-Each mock mirrors the exact signature from interface-contracts.md.
-"""
 
 from __future__ import annotations
 
@@ -16,7 +8,6 @@ from app.models.schemas import (
     EngagementMetrics, EngagementType,
 )
 
-# ── Context Extraction ──────────────────────────────────────
 
 async def mock_extract_context(message: str, history: list[Turn]) -> ContextObject:
     """
@@ -33,14 +24,12 @@ async def mock_extract_context(message: str, history: list[Turn]) -> ContextObje
     )
 
 
-# ── Query Embedding ─────────────────────────────────────────
 
 async def mock_embed_query(context: ContextObject) -> list[float]:
     """Return a random 1536-dim vector.  Good enough for wiring tests."""
     return [random.uniform(-1, 1) for _ in range(1536)]
 
 
-# ── Ad Embedding (ingestion time) ───────────────────────────
 
 async def mock_embed_ad(
     product_name: str,
@@ -64,7 +53,6 @@ async def mock_generate_initial_context(ad: Ad) -> str:
     )
 
 
-# ── Response Synthesis ──────────────────────────────────────
 
 async def mock_generate_response(
     message: str,
@@ -100,7 +88,6 @@ async def mock_generate_response(
     )
 
 
-# ── Product Extraction from URL ─────────────────────────────
 
 async def mock_extract_product_from_url(page_text: str) -> dict:
     """Returns canned product data for testing the extraction pipeline."""
@@ -114,7 +101,6 @@ async def mock_extract_product_from_url(page_text: str) -> dict:
     }
 
 
-# ── Image Generation ───────────────────────────────────────
 
 async def mock_generate_image(prompt: str, ad: "Ad | None") -> dict:
     """
@@ -132,7 +118,6 @@ async def mock_generate_image(prompt: str, ad: "Ad | None") -> dict:
     }
 
 
-# ── Engagement Detection ────────────────────────────────────
 
 async def mock_detect_engagement(
     follow_up_message: str,

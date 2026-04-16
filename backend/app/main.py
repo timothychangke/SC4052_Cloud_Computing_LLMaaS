@@ -28,9 +28,6 @@ setup_logging(json_output=False)  # flip to True in prod
 log = structlog.get_logger()
 
 
-# ── DB schema bootstrap ─────────────────────────────────────────────────
-# We run this on every startup so you don't have to remember to run
-# migrations separately.  It's idempotent (CREATE IF NOT EXISTS).
 
 SCHEMA_SQL = """
 CREATE EXTENSION IF NOT EXISTS vector;

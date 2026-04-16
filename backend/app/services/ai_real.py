@@ -53,7 +53,6 @@ async def warmup_embed_model() -> None:
     _embed_model = model
 
 
-# Embedding helper
 
 async def _embed(text: str) -> list[float]:
     """Encode text locally with sentence-transformers (768-dim, non-blocking)."""
@@ -62,7 +61,6 @@ async def _embed(text: str) -> list[float]:
     return vec.tolist()
 
 
-# ── Context Extraction ──────────────────────────────────────
 
 async def real_extract_context(message: str, history: list[Turn]) -> ContextObject:
     """
@@ -114,7 +112,6 @@ Latest user message: {message}"""
     )
 
 
-# ── Query Embedding ─────────────────────────────────────────
 
 async def real_embed_query(context: ContextObject) -> list[float]:
     """Embed the query context as a 768-dim vector for pgvector search."""
@@ -127,7 +124,6 @@ async def real_embed_query(context: ContextObject) -> list[float]:
     return await _embed(text)
 
 
-# ── Ad Embedding (ingestion time) ───────────────────────────
 
 async def real_embed_ad(
     product_name: str,
@@ -179,7 +175,6 @@ Target intents: {', '.join(target_intents)}"""
     return await _embed(keyword_text)
 
 
-# ── Initial Context Generation ────────────────────────────────
 
 async def real_generate_initial_context(ad: Ad) -> str:
     """
@@ -214,7 +209,6 @@ Return ONLY the context guide as plain text bullet points. No preamble."""
     return resp.choices[0].message.content.strip()
 
 
-# ── Response Synthesis ──────────────────────────────────────
 
 async def real_generate_response(
     message: str,
@@ -287,7 +281,6 @@ async def real_generate_response(
     )
 
 
-# ── Product Extraction from URL ─────────────────────────────
 
 async def real_extract_product_from_url(page_text: str) -> dict:
     """
@@ -323,7 +316,6 @@ Webpage content:
     return json.loads(raw)
 
 
-# ── Image Generation (DALL-E 3 + product-placement prompt) ─
 
 async def _build_product_placement_prompt(user_prompt: str, ad: Ad) -> str:
     """
@@ -377,7 +369,6 @@ async def real_generate_image(prompt: str, ad: Ad | None) -> dict:
     if ad:
         enhanced_prompt = await _build_product_placement_prompt(prompt, ad)
 
-    # --- attempt image-grounded generation when a product image exists ---
     if ad and ad.product_image_url:
         try:
             async with httpx.AsyncClient(timeout=10) as http:
@@ -428,7 +419,6 @@ async def real_generate_image(prompt: str, ad: Ad | None) -> dict:
     }
 
 
-# ── Engagement Detection ────────────────────────────────────
 
 async def real_detect_engagement(
     follow_up_message: str,
