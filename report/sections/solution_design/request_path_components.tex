@@ -6,8 +6,7 @@
 % ------------------------------------------------------------
 
 This subsection describes the synchronous, user-facing pipeline: the
-sequence of components that a single user message---or a single image
-request---traverses between arrival at the orchestrator and the
+sequence of components that a single user message traverses between arrival at the orchestrator and the
 return of the rendered response. Asynchronous concerns such as event
 logging, analytics rollups, and the advertiser portal are deferred to
 Section~\ref{subsec:offline-path}. The components below are presented
@@ -59,9 +58,9 @@ response rather than to an error, and a response-synthesis failure is
 the only condition under which the endpoint returns a non-2xx status.
 The orchestrator therefore treats advertising as a strictly additive
 overlay on a working chat service, never as a precondition for it.
-Second, the secondary endpoints---\texttt{GET /track/click} for click
+Second, the secondary endpoints, \texttt{GET /track/click} for click
 attribution, \texttt{GET /analytics/summary} for the dashboard, and
-the \texttt{/portal/*} family for advertiser self-service---are mounted
+the \texttt{/portal/*} family for advertiser self-service, are mounted
 on the same application but execute outside the latency-critical chat
 path and are therefore free to perform synchronous database work that
 the chat handler would have to defer.
@@ -204,8 +203,7 @@ the image model directly. Instead, an auxiliary lightweight LLM call
 rewrites the prompt into a \emph{placement prompt}: a new
 specification that preserves the user's stated subject, style, and
 composition while introducing the matched product as a diegetic
-element of the scene---worn by a subject, held by a hand, resting on
-a surface, displayed on a shelf---chosen to fit the semantics of the
+element of the scene chosen to fit the semantics of the
 original request rather than to dominate it. The rewritten prompt is
 then passed to the image model, \texttt{gpt-image-1}, which renders
 the final image.

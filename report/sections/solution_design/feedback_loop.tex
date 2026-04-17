@@ -110,9 +110,7 @@ ad surfaces if one exists in the inventory.
 click events feed a slow-moving per-ad quality score
 $q_a \in [0,1]$, computed as a smoothed engagement-plus-click rate over the
 ad's recent impressions. This score is not part of the per-request scoring
-formula in Section~\ref{subsubsec:reranking-business-logic} --- introducing
-it there would risk a runaway feedback loop in which a few early lucky
-impressions monopolise future serving --- but it is exposed to the analytics
+formula in Section~\ref{subsubsec:reranking-business-logic} but it is exposed to the analytics
 dashboard and used to surface under-performing ads to the (currently
 manual) inventory review process. A learned re-ranker that incorporates
 $q_a$ directly, with appropriate exploration, is the natural next step and

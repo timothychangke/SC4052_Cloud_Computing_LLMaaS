@@ -7,10 +7,10 @@ write the first line of code in each area. We therefore fixed the
 interfaces between major components in Week~1, before any production
 implementation existed on either side of them, and treated those
 interfaces as frozen artefacts that could be changed only by mutual
-agreement. The pay-off is that the two human workstreams --- a backend
+agreement. The pay-off is that the our two human workstreams, a backend
 workstream covering the orchestrator, database, portal, and event
 pipeline, and an AI/LLM workstream covering context extraction, vector
-search, re-ranking, response generation, and engagement judging ---
+search, re-ranking, response generation, and engagement judging 
 were able to develop in parallel against typed mocks of one another and
 integrate in a single short sitting rather than in a protracted
 debugging phase.
@@ -26,8 +26,7 @@ label, a purchase-signal scalar in $[0,1]$, and an \texttt{ad\_receptivity}
 enum whose \texttt{none} value short-circuits the matching pipeline
 entirely for sensitive conversations. An \texttt{Ad} is the unit of
 inventory, carrying targeting metadata, creative text, brand-safety
-tags, a bid in CPM, a remaining budget, and two optional fields ---
-\texttt{similarity} and \texttt{score} --- that are populated in
+tags, a bid in CPM, a remaining budget, and two optional fields that are populated in
 sequence by the vector search and the re-ranker. A
 \texttt{ResponseObject} is what the orchestrator returns to the
 frontend: a response text, a boolean indicating whether an ad was
@@ -132,9 +131,9 @@ natural successor to the current framework.
 \label{subsec:error-handling}
 
 The serving path touches three external systems that can each fail
-independently --- a Postgres instance with a pgvector extension, a
+independently. A Postgres instance with a pgvector extension, a
 Redis instance holding session state, and one or more remote LLM
-endpoints --- and any production deployment must answer the question
+endpoints and any production deployment must answer the question
 of what the user sees when one of them is unreachable or slow. Our
 guiding principle is that \emph{the chat response is the product},
 and that every component in the ad pipeline is expendable in the
@@ -145,8 +144,7 @@ inconsistent data.
 
 This principle is realised as a small number of explicit fallback
 paths, each triggered by a specific class of failure. A failure of the
-context extractor --- whether a timeout, a malformed JSON response, or
-a schema validation error --- causes the orchestrator to substitute a
+context extractor causes the orchestrator to substitute a
 default \texttt{ContextObject} whose \texttt{ad\_receptivity} is set
 to \texttt{none}. This value is the one the matching pipeline
 interprets as ``do not serve an ad on this turn,'' so the effect of
