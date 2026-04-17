@@ -1,3 +1,5 @@
+\subsection{Example 1: Product Research Conversation}
+\label{subsec:example-product-research}
 The first example traces a complete request through the ad-serving pipeline,
 from a user query about marathon footwear to an impression recorded in the
 database.  Figure~\ref{fig:example-1} shows the rendered response: the
@@ -41,26 +43,48 @@ pipeline to proceed; \texttt{none} would skip retrieval entirely.
 
 The topics are concatenated into a retrieval string and encoded into a dense
 vector.  A nearest-neighbour search over the \texttt{pgvector} embeddings
-column returns the Nike Pegasus~41 at cosine similarity $0.7918$, with its
+column returns three candidates ranked by cosine similarity, with their
 campaign budget fields attached for the gate check:
 
-\begin{lstlisting}[style=jsonstyle, caption={Top vector-search candidate.},
-label={lst:example1-retrieval}]
-{
-  "ad_id":        "ad_nike_pegasus_41",
-  "product_name": "Nike Pegasus 41",
-  "similarity":   0.7918,
-  "bid_cpm":      5.00,
-  "daily_budget": 100.00,
-  "today_spend":  12.40
-}
+\begin{lstlisting}[style=jsonstyle, caption={Vector-search candidates returned
+by the retrieval stage.}, label={lst:example1-retrieval}]
+[
+  {
+    "ad_id":        "ad_nike_pegasus_41",
+    "product_name": "Nike Pegasus 41",
+    "similarity":   0.7918,
+    "bid_cpm":      5.00,
+    "daily_budget": 100.00,
+    "today_spend":  12.40
+  },
+  {
+    "ad_id":        "ad_allbirds_tree_runners",
+    "product_name": "Allbirds Tree Runners",
+    "similarity":   0.6961,
+    "bid_cpm":      4.50,
+    "daily_budget": 80.00,
+    "today_spend":  18.20
+  },
+  {
+    "ad_id":        "ad_notion_team_plan",
+    "product_name": "Notion Team Plan",
+    "similarity":   0.4991,
+    "bid_cpm":      3.00,
+    "daily_budget": 60.00,
+    "today_spend":  5.10
+  }
+]
 \end{lstlisting}
 
 \noindent
 The re-ranker combines similarity, bid CPM, and purchase signal into a
-composite score.  The budget gate confirms that
-$12.40 + 0.005 \ll 100.00$, so the ad passes and becomes the sole injection
-candidate.
+composite score.  The Nike Pegasus~41 ranks first ($\text{similarity}=0.7918$),
+followed by the Allbirds Tree Runners ($0.6961$) and the Notion Team Plan
+($0.4991$).  The Notion Team Plan is filtered out by the topic-relevance
+threshold, as productivity software is semantically distant from the running
+footwear query.  The budget gate confirms that
+$12.40 + 0.005 \ll 100.00$ for the top candidate, so the Nike Pegasus~41
+passes and becomes the sole injection candidate.
 
 \subsubsection{Stage 3: Prompt Assembly}
 \label{subsubsec:example1-prompt}
