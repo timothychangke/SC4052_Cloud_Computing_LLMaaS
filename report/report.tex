@@ -415,8 +415,6 @@
 \label{sec:illustrative-examples}
 % ============================================================
  
-\subsection{Example 1: Product Research Conversation}
-\label{subsec:example-product-research}
 \input{sections/illustrative_examples/example1.tex}
  
 \subsection{Example 2: Sensitive Conversation (Ad Suppression)}
@@ -431,20 +429,7 @@
 \label{subsec:example-engagement}
 \input{sections/illustrative_examples/example4.tex}
  
-\subsection{Example 5: Adaptive Context Optimisation Loop}                % NEW example
-\label{subsec:example-optimization}
-% - Scenario: a Nike Pegasus 41 ad has accumulated 245 impressions,
-%   38 engagements, avg_engagement_score=0.68, avg_naturalness=0.72,
-%   avg_purchase_proximity=0.41, with some dismissals
-% - Admin clicks "Optimize Now" in the Context Optimization History panel
-% - optimize_ad_context() checks guards (≥5 engagements, ≥24h since last
-%   optimisation), builds the strategist prompt, calls the LLM
-% - Returned context softens tone and adds feature-specificity guidance;
-%   reasoning block cites the low naturalness and dismissal pattern
-% - New context persisted at version 3; metrics snapshot written to
-%   ad_context_history; next response-synthesis call uses the new guide
- 
-\subsection{Example 6: Image Generation with Product Placement}
+\subsection{Example 5: Image Generation with Product Placement}
 \label{subsec:example-image-generation}
 \input{sections/illustrative_examples/example6.tex}
  

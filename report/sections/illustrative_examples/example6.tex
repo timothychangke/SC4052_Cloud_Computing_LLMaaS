@@ -15,57 +15,20 @@ Nike Pegasus~41.
     \label{fig:example-6}
 \end{figure}
 
-\subsubsection{Stage 1: Context Extraction}
+\subsubsection{Stages 1--2: Context Extraction and Ad Matching}
 \label{subsubsec:example6-context}
 
 The user submits a short creative prompt:
 \emph{``A runner training at sunrise on a mountain trail''}.
-The context-extraction module classifies the request as an image-generation
-query and identifies its commercial relevance:
-
-\begin{lstlisting}[style=jsonstyle, caption={Context extraction output for
-the image-generation query.}, label={lst:example6-context}]
-{
-  "intent":          "image_generation",
-  "ad_receptivity":  "medium",
-  "purchase_signal": 0.75,
-  "topics":          ["running", "trail running", "outdoor fitness"],
-  "entities":        []
-}
-\end{lstlisting}
-
-\noindent
-A \texttt{purchase\_signal} of~0.75 and \texttt{ad\_receptivity} of
-\texttt{medium} place the request on the commercial path.  The
-\texttt{image\_generation} intent routes the request to the image-generation
-handler rather than the text-synthesis handler, but the downstream ad-matching
-logic is identical.
-
-\subsubsection{Stage 2: Vector Search and Ad Matching}
-\label{subsubsec:example6-retrieval}
-
-The topics \emph{``running trail running outdoor fitness''} are encoded into a
-dense vector and searched against the ad inventory.  The Nike Pegasus~41
-returns the highest cosine similarity, well above the acceptance threshold:
-
-\begin{lstlisting}[style=jsonstyle, caption={Top vector-search candidate for
-the image query.}, label={lst:example6-retrieval}]
-{
-  "ad_id":             "ad_nike_pegasus_41",
-  "product_name":      "Nike Pegasus 41",
-  "similarity":        0.8124,
-  "bid_cpm":           5.00,
-  "daily_budget":      100.00,
-  "today_spend":       12.40,
-  "product_image_url": "https://assets.example/nike_pegasus_41.png"
-}
-\end{lstlisting}
-
-\noindent
-The presence of a \texttt{product\_image\_url} field signals to the handler
-that an image-edit call is available as a grounded alternative to a plain
-text-to-image call.  The budget gate confirms that the remaining daily budget
-is sufficient, so the ad passes to the prompt-rewriting stage.
+Context extraction and vector search proceed as described in
+Section~\ref{subsubsec:example1-context} and~\ref{subsubsec:example1-retrieval}.
+The key difference is that the \texttt{intent} field is set to
+\texttt{image\_generation}, routing the request to the image-generation handler
+rather than the text-synthesis handler.  The Nike Pegasus~41 again ranks first
+(similarity~$= 0.8124$) and passes the budget gate.  Notably, its inventory
+record includes a \texttt{product\_image\_url} field, which signals to the
+handler that an image-edit call is available as a grounded alternative to a
+plain text-to-image call.
 
 \subsubsection{Stage 3: Prompt Rewriting}
 \label{subsubsec:example6-prompt}

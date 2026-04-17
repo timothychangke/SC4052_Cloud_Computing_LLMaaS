@@ -40,24 +40,14 @@ dispatching a retrieval request: if either \texttt{ad\_receptivity} is
 \texttt{low} \emph{and} the topic set intersects the sensitivity list, the
 ad-matching stage is skipped.
 
-\subsubsection{Stage 2: Ad Matching Skipped}
+\subsubsection{Stage 2: Ad Matching Skipped and Response Generation}
 \label{subsubsec:example2-skip}
 
-Because the sensitivity gate fires, the orchestrator forwards an empty ad
-list directly to the synthesis stage without issuing any embedding or
-vector-search call.  No candidates are scored, no budget gate is evaluated,
-and no \texttt{<sponsored\_context>} block is assembled.  This is a stricter
-outcome than the threshold-rejection path seen in
-Example~\ref{subsec:example-irrelevant}: there, the pipeline searched but
-found no qualifying ads; here, it does not search at all.
-
-\subsubsection{Stage 3: Response Generation}
-\label{subsubsec:example2-response}
-
-The system prompt passed to the LLM contains only the conversational
-instruction set --- no sponsored context, no tracking URL, no disclosure
-obligation.  The model responds with empathetic, helpful guidance
-appropriate to a mental-health topic, entirely free of product mentions.
-No impression event is written and no campaign spend is recorded for this
-turn.  From the user's perspective the interaction is indistinguishable from
-a standard ad-free assistant; the suppression is invisible by design.
+Because the sensitivity gate fires, the orchestrator bypasses the retrieval
+pipeline entirely. No embedding call, vector search, or scoring is
+performed, and no \texttt{<sponsored\_context>} block is assembled.  This is
+stricter than the threshold-rejection path in
+Example~\ref{subsec:example-irrelevant}, where the pipeline searched but found
+no qualifying ads; here, it does not search at all.  The LLM receives only the
+conversational instruction set, responds with empathetic guidance free of
+product mentions, and no impression event or campaign spend is recorded.

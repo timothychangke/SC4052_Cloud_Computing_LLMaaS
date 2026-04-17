@@ -63,8 +63,7 @@ entity matcher: if the next user message contains the ad's product name,
 brand, or any of the entities extracted from its title, we tentatively flag
 the turn as engaged. This catches the easy cases (``tell me more about the
 Pegasus 41'') at essentially zero cost. The second stage, invoked only when
-the first stage is ambiguous, is a lightweight LLM judge --- the same
-Haiku-tier model used for context extraction --- prompted with the served ad,
+the first stage is ambiguous, is a lightweight LLM judge prompted with the served ad,
 the previous assistant turn, and the new user turn, and asked to return a
 boolean \texttt{engaged} field together with a short rationale and a
 confidence score in $[0,1]$.
