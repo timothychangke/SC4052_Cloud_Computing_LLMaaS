@@ -1,8 +1,7 @@
 \subsection{Advertiser-Facing Surfaces}
 \label{subsec:advertiser-surfaces}
 
-The components described so far --- matching, re-ranking, engagement
-detection, and the adaptive feedback loop --- are all invisible to the
+The components described so far are all invisible to the
 advertiser. They live inside the request path of the chat service and
 communicate only with the assistant and the event store. For the system
 to function as a product rather than a research prototype, advertisers
@@ -27,7 +26,7 @@ and creative text that the matching pipeline consumes.
 The resource hierarchy is enforced in the URL structure --- campaigns
 are reached as
 \texttt{/portal/advertisers/\{advertiser\_id\}/campaigns}, ads as
-\texttt{/portal/campaigns/\{campaign\_id\}/ads} --- so that ownership is
+\texttt{/portal/campaigns/\{campaign\_id\}/ads}. Its so that ownership is
 unambiguous at every write and authorisation reduces to a prefix check.
 Each resource supports the usual five operations (\texttt{POST},
 \texttt{GET} list, \texttt{GET} by id, \texttt{PATCH}, and soft delete
@@ -56,8 +55,7 @@ bounded by the number of ads created during its outage.
 
 The analytics layer is intentionally a read-only projection over the
 events table rather than a second source of truth. Every metric the
-advertiser sees --- impressions, clicks, engagements, click-through
-rate, engagement rate, estimated revenue --- is computed by a SQL
+advertiser sees is computed by a SQL
 aggregation over the same \texttt{events} rows that the engagement
 detector writes in Section~\ref{subsubsec:llm-judge-engagement}. This
 discipline is what allows the feedback loop and the reporting surface
@@ -85,10 +83,10 @@ from the dashboard is orders of magnitude below the write volume from
 the serving path.
 
 The React dashboard that consumes these endpoints is deliberately
-unambitious in scope. It provides four pages --- an overview with
+unambitious in scope. It provides four pages (an overview with
 headline metrics and a time series chart, an advertisers list, a
 campaigns list scoped to a selected advertiser, and a campaign detail
-view with per-ad breakdowns --- and uses Recharts for all
+view with per-ad breakdowns) and uses Recharts for all
 visualisations. Its visual language is inherited directly from the
 chat interface's stylesheet so that the two surfaces read as a single
 product rather than two assemblages. The dashboard performs no client-

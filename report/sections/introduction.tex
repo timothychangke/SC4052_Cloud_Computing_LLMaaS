@@ -17,10 +17,10 @@ natural-language text. There are no sidebars, no interstitial slots, and no
 visual regions in which a banner can be placed without breaking the
 conversational contract between the system and its user. At the same time, these
 interfaces are absorbing an increasing share of the queries that users
-previously directed to search engines---product research, comparison shopping,
-recommendation requests---precisely the query types that carry the highest
+previously directed to search engines. They include product research, comparison shopping,
+recommendation requests, precisely the query types that carry the highest
 commercial intent and, consequently, the highest advertising value. The shift is
-not merely a change of medium; it is a structural transformation in how users
+not merely a change of medium. It is a structural transformation in how users
 express intent, receive information, and make purchasing decisions.
 
 The advertising industry therefore faces a concrete technical problem: how to
@@ -31,8 +31,8 @@ sacrifices the natural feel of the conversation. Inserting interstitial
 advertisements between turns interrupts the dialogue flow and erodes user trust.
 Neither approach exploits the distinctive capability of a large language model
 (LLM), namely its ability to generate contextually appropriate, fluent
-natural-language text that integrates information from multiple sources---including
-sponsored product information---into a single coherent response.
+natural-language text that integrates information from multiple sources, including
+sponsored product information into a single coherent response.
 
 This observation motivates the present work. If the LLM can understand the
 user's intent, match it against an inventory of relevant products, and weave a
@@ -48,8 +48,7 @@ support image generation as a native modality, and a user who asks the system
 to render a scene is expressing creative and often commercial intent in a form
 that is no less monetisable than a textual product query. If the language model
 can weave a sponsored product into a written answer, an image model can, by
-analogous reasoning, place that product naturally within a generated scene---on
-a shelf, in a character's hand, within the environment the user described---rather
+analogous reasoning, place that product naturally within a generated scene rather
 than overlaying a banner on top of the artwork. Treating text and image
 generation as two surfaces of a single advertising pipeline is therefore a
 natural extension of the core thesis, and one that this project pursues
@@ -63,16 +62,16 @@ pacing, a way to create and manage ads without touching the database directly,
 and a way for both the platform operator and the advertiser to observe how
 their money is being spent. These concerns are conventionally relegated to
 ``future work,'' but they fundamentally shape the data model and the request
-path---budget gating, for example, must happen inside the ad-retrieval loop,
-not as an afterthought---and this project therefore treats them as first-class
+path. Budget gating, for example, must happen inside the ad-retrieval loop,
+not as an afterthought. This project therefore treats them as first-class
 deliverables rather than deferred extensions.
 
 \subsection{Project Objectives}
 \label{subsec:objectives}
 
 This project designs, implements, and evaluates an end-to-end LLM-powered
-conversational advertising platform---referred to throughout this report as
-\textit{Ad LLM as a Service}---that delivers inline sponsored product
+conversational advertising platform (referred to throughout this report as
+\textit{Ad LLM as a Service})that delivers inline sponsored product
 recommendations within AI chat responses. The platform satisfies the following
 objectives:
 
@@ -80,7 +79,7 @@ objectives:
   \item \textbf{Intent-aware context extraction.} A lightweight LLM call
     extracts structured context from each user message and the preceding
     conversation history, producing a classification of intent, topical
-    relevance, sentiment, purchase signal strength, and---critically---a
+    relevance, sentiment, purchase signal strength, and a
     sensitivity-aware ad receptivity score that gates whether any advertisement
     should be shown at all.
 
@@ -88,9 +87,9 @@ objectives:
     extracted context is embedded into a vector representation and matched
     against a pre-embedded ad inventory via cosine similarity search over
     \texttt{pgvector}. Candidate ads are then filtered through a campaign
-    eligibility check---verifying that the parent campaign is active, within
+    eligibility check. This verifies that the parent campaign is active, within
     its scheduled window, and has not exhausted either its total budget or
-    its daily cap---and re-ranked by a business-rule stage that incorporates
+    its daily cap and re-ranked by a business-rule stage that incorporates
     bid price, per-session frequency caps, and brand-safety tags.
 
   \item \textbf{Natural ad integration with mandatory disclosure.} The main
@@ -112,14 +111,13 @@ objectives:
     measurement and are the substrate on which downstream optimisation
     operates.
 
-  \item \textbf{Ethical safeguards.} Conversations classified as sensitive---those
+  \item \textbf{Ethical safeguards.} Conversations classified as sensitive. They include those
     involving health crises, emotional distress, financial hardship, or
-    grief---are automatically excluded from ad injection, regardless of
+    grief and are automatically excluded from ad injection, regardless of
     commercial relevance.
 
   \item \textbf{Adaptive per-ad context optimisation.} Each advertisement in
-    the inventory carries a dynamic presentation-guidance document---its
-    \emph{ad context}---which is injected into the response-synthesis prompt
+    the inventory carries a dynamic presentation-guidance document which is injected into the response-synthesis prompt
     alongside the product description. An initial version of this context is
     generated automatically by an LLM at the moment the ad is created, so that
     every ad begins life with a coherent presentation strategy rather than an
@@ -148,8 +146,7 @@ objectives:
     self-serve REST API and accompanying React interface allow advertisers
     to register, organise their spend into campaigns with optional start
     dates, end dates, and daily budget caps, and create ads within each
-    campaign. Campaigns follow an explicit lifecycle---\texttt{draft},
-    \texttt{active}, \texttt{paused}, \texttt{completed}---with
+    campaign. Campaigns follow an explicit lifecycle with
     auto-completion when the total budget is exhausted, and daily spend is
     reset lazily at first touch each new day rather than via a cron job.
     Ad creation is accelerated by a URL-based extraction flow in which the
@@ -169,7 +166,7 @@ objectives:
 
   \item \textbf{Functional MVP.} The deliverable is a working prototype that
     demonstrates the complete pipeline from user message to ad-augmented
-    response---across both text and image modalities---together with the
+    response across both text and image modalities. Together with the
     advertiser portal, the adaptive context optimiser, and both analytics
     dashboards.
 \end{enumerate}
@@ -185,13 +182,13 @@ coordinates all internal modules, a single Redis instance manages session state,
 and a single PostgreSQL database (extended with \texttt{pgvector}) stores the
 ad inventory, the advertiser and campaign records, the daily spend log, the
 ad-context history, and the event log. This monolithic design is appropriate
-for the current scale---tens of thousands of ads, moderate request
-concurrency---and avoids the operational complexity of a distributed
+for the current scale, moderate request
+concurrency and avoids the operational complexity of a distributed
 microservice architecture.
 
 Two external dependencies impose hard constraints on latency and cost. Every
-chat request requires at minimum two LLM API calls---one lightweight call for
-context extraction and one full-model call for response synthesis---plus one
+chat request requires at minimum two LLM API calls (one lightweight call for
+context extraction and one full-model call for response synthesis) plus one
 embedding API call for the query vector. The total end-to-end latency budget
 is three seconds, inclusive of all network round-trips and internal
 processing. The per-request cost is dominated by these API calls, and the
@@ -211,9 +208,9 @@ metrics become available only after a short delay rather than synchronously
 with the turn in which the ad was shown.
 
 The adaptive context optimiser is similarly a deferred, out-of-band process.
-Optimisation for a given advertisement is gated by two guards---a minimum of
+Optimisation for a given advertisement is gated by two guards. A minimum of
 five recorded engagements and a minimum interval of twenty-four hours since
-the previous revision---which together prevent the system from overfitting to
+the previous revision, which together prevent the system from overfitting to
 noise and from thrashing the ad context under light traffic. An advertisement
 with insufficient traffic therefore retains its LLM-generated initial context
 indefinitely, and optimisation only begins once the statistical foundation is
